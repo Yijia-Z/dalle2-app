@@ -44,7 +44,7 @@ export default function Home() {
           {/* Top Bar */}
           <div className="flex justify-between items-center">
             {/* Mobile History Toggle */}
-            <div className="md:hidden">
+            <div className="md:hidden pr-4">
               <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="outline" size="icon">
