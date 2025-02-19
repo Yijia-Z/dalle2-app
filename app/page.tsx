@@ -57,7 +57,7 @@ export default function Home() {
               </Sheet>
             </div>
 
-            <div className="flex pr-4 md:hidden absolute left-1/2 -translate-x-1/2">
+            <div className="flex pr-4">
               <div className="w-4 h-4 bg-yellow-200"></div>
               <div className="w-4 h-4 bg-cyan-400"></div>
               <div className="w-4 h-4 bg-green-500"></div>
