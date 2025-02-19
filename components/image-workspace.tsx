@@ -17,6 +17,7 @@ import { MaskInterface } from "./mask-interface"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useLocalStorage } from "@/lib/use-local-storage"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface ImageWorkspaceProps {
   updateHistory: (newRecord: GenerationRecord) => void
@@ -464,7 +465,15 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
           />
         )}
 
-        {results.length > 0 && (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: numImages }).map((_, index) => (
+              <div key={index} className="relative aspect-square">
+                <Skeleton className="w-full h-full rounded-lg" />
+              </div>
+            ))}
+          </div>
+        ) : results.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {results.map((base64Image, index) => (
               <div key={index} className="relative aspect-square group">
