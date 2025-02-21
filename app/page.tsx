@@ -3,7 +3,7 @@ import { HistoryPanel } from "@/components/history-panel"
 import { ImageWorkspace } from "@/components/image-workspace"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, MoonIcon, SunIcon } from "lucide-react"
+import { Menu, MoonIcon, SunIcon, GithubIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useLocalStorage } from "@/lib/use-local-storage"
 import type { GenerationRecord } from "@/lib/types"
@@ -127,17 +127,29 @@ export default function Home() {
             </div>
             <h1 className="text-3xl font-semibold hidden md:block">DALL·E 2</h1>
 
-            {/* Theme Toggle */}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-              className="ml-auto"
-            >
-              <SunIcon className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <MoonIcon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              <span className="sr-only">Toggle theme</span>
-            </Button>
+            <div className="flex items-center gap-2 ml-auto">
+              <a
+                href="https://github.com/Yijia-Z/dalle2-app"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline" size="icon">
+                  <GithubIcon className="h-4 w-4" />
+                  <span className="sr-only">GitHub repository</span>
+                </Button>
+              </a>
+
+              {/* Theme Toggle */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              >
+                <SunIcon className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <MoonIcon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <span className="sr-only">Toggle theme</span>
+              </Button>
+            </div>
           </div>
 
           {/* Main Workspace */}
