@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useLocalStorage } from "@/lib/use-local-storage"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getImageAsDataUrl } from "@/lib/indexeddb"
 
 interface ImageWorkspaceProps {
   updateHistory: (newRecord: GenerationRecord) => void
@@ -47,15 +48,30 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
       setNumImages(selectedRecord.n)
       setMode(selectedRecord.type)
 
-      if (selectedRecord.originalImage) {
-        setUploadedImage(selectedRecord.originalImage)
+      // Load images from IndexedDB
+      const loadImages = async () => {
+        try {
+          if (selectedRecord.originalImage) {
+            const originalDataUrl = await getImageAsDataUrl(selectedRecord.originalImage)
+            setUploadedImage(originalDataUrl || null)
+          }
+
+          if (selectedRecord.maskImage) {
+            const maskDataUrl = await getImageAsDataUrl(selectedRecord.maskImage)
+            setMask(maskDataUrl || null)
+          }
+
+          // Load result images
+          const loadedImages = await Promise.all(
+            selectedRecord.base64Images.map(key => getImageAsDataUrl(key))
+          )
+          setResults(loadedImages.filter((img): img is string => img !== undefined))
+        } catch (error) {
+          console.error("Failed to load images:", error)
+        }
       }
 
-      if (selectedRecord.maskImage) {
-        setMask(selectedRecord.maskImage)
-      }
-
-      setResults(selectedRecord.base64Images)
+      loadImages()
     }
   }, [selectedRecord])
 
@@ -199,7 +215,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
 
           {selectedRecord && (
             <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2 text-lg">
+              <div className="flex items-center gap-2 text-sm sm:text-lg">
                 <Eye />
                 {selectedRecord.type === "generate" && <Sparkles />}
                 {selectedRecord.type === "variation" && <Images />}
@@ -488,13 +504,19 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
             {results.map((base64Image, index) => (
               <div key={index} className="relative aspect-square group">
                 <div className="relative w-full h-full">
-                  <Image
-                    src={base64Image || "/placeholder.svg"}
-                    alt={`Generated image ${index + 1}`}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    className="object-contain rounded-lg"
-                  />
+                  {base64Image ? (
+                    <Image
+                      src={base64Image}
+                      alt={`Generated image ${index + 1}`}
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-contain rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-muted rounded-lg">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                    </div>
+                  )}
                 </div>
                 <div className="absolute bottom-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button

@@ -24,4 +24,15 @@ export async function getImage(key: string): Promise<Blob | undefined> {
 export async function deleteImage(key: string) {
     const db = await initDB();
     await db.delete(STORE_NAME, key);
+}
+
+export async function getImageAsDataUrl(key: string): Promise<string | undefined> {
+    const blob = await getImage(key);
+    if (!blob) return undefined;
+
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+    });
 } 

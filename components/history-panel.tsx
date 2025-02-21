@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Download, Trash2, CheckSquare, Square, ArrowLeftRight, Eye, History, Edit, Images, Sparkles, CheckCheck } from "lucide-react"
@@ -8,6 +8,7 @@ import type { GenerationRecord } from "@/lib/types"
 import Image from "next/image"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import { getImageAsDataUrl } from "@/lib/indexeddb"
 
 interface HistoryPanelProps {
   history: GenerationRecord[]
@@ -18,6 +19,32 @@ interface HistoryPanelProps {
 
 export function HistoryPanel({ history, onDelete, onSelect, className = "" }: HistoryPanelProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [imageCache, setImageCache] = useState<Record<string, string>>({})
+
+  // Load images from IndexedDB
+  useEffect(() => {
+    const loadImages = async () => {
+      for (const record of history) {
+        for (const imageKey of record.base64Images) {
+          if (!imageCache[imageKey]) {
+            try {
+              const dataUrl = await getImageAsDataUrl(imageKey)
+              if (dataUrl) {
+                setImageCache(prev => ({
+                  ...prev,
+                  [imageKey]: dataUrl
+                }))
+              }
+            } catch (error) {
+              console.error(`Failed to load image ${imageKey}:`, error)
+            }
+          }
+        }
+      }
+    }
+
+    loadImages()
+  }, [history])
 
   const isAllSelected = history.length > 0 && selectedIds.length === history.length
   const toggleSelectAll = () => {
@@ -62,8 +89,9 @@ export function HistoryPanel({ history, onDelete, onSelect, className = "" }: Hi
     onDelete([id])
   }
 
-  const getImageSource = (record: GenerationRecord, index: number) => {
-    return record.base64Images[index] || "/placeholder.svg"
+  const getImageSource = (record: GenerationRecord, index: number): string => {
+    const imageKey = record.base64Images[index]
+    return imageCache[imageKey] || '' // Return empty string or placeholder if image not loaded
   }
 
   const openOriginalImage = (record: GenerationRecord, index: number, e: React.MouseEvent) => {
@@ -223,16 +251,18 @@ export function HistoryPanel({ history, onDelete, onSelect, className = "" }: Hi
                   "w-full",
                   record.base64Images.length > 1 ? "grid grid-cols-2 gap-2" : "relative aspect-square"
                 )}>
-                  {record.base64Images.map((_, index) => (
-                    <div key={index} className="relative aspect-square group/image">
+                  {record.base64Images.map((imageKey, index) => (
+                    <div key={imageKey} className="relative aspect-square group/image">
                       <div className="relative w-full h-full">
-                        <Image
-                          src={getImageSource(record, index)}
-                          alt={`Generated image ${index + 1}`}
-                          fill
-                          sizes="(max-width: 768px) 100vw, 50vw"
-                          className="object-contain rounded-md"
-                        />
+                        {imageCache[imageKey] && (
+                          <Image
+                            src={imageCache[imageKey]}
+                            alt={`Generated image ${index + 1}`}
+                            fill
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                            className="object-contain rounded-md"
+                          />
+                        )}
                         {!selectedIds.includes(record.id) && (
                           <div
                             className="absolute inset-0 bg-background/80 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"

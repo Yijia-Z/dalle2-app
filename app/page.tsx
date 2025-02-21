@@ -17,31 +17,69 @@ export default function Home() {
   const MAX_HISTORY_LENGTH = 100; // Set a limit for the number of records
 
   const updateHistory = async (newRecord: GenerationRecord) => {
-    // Save images to IndexedDB
-    for (const base64Image of newRecord.base64Images) {
-      // Convert base64 string to Blob before saving
-      const response = await fetch(base64Image);
-      const blob = await response.blob();
-      await saveImage(newRecord.id, blob);
-    }
+    // Save images to IndexedDB and create a modified record for localStorage
+    const storageRecord = { ...newRecord };
 
-    // Update metadata in local storage 
-    setHistory((prev) => {
-      const updated = [newRecord, ...prev];
-      if (updated.length > MAX_HISTORY_LENGTH) {
-        const oldest = updated.pop();
-        if (oldest) {
-          // Delete all images associated with the oldest record
-          oldest.base64Images.forEach(async () => {
-            await deleteImage(oldest.id);
-          });
-        }
+    try {
+      // Save each image to IndexedDB
+      for (let i = 0; i < newRecord.base64Images.length; i++) {
+        const base64Image = newRecord.base64Images[i];
+        const response = await fetch(base64Image);
+        const blob = await response.blob();
+        // Save with a unique key for each image in the record
+        const imageKey = `${newRecord.id}_${i}`;
+        await saveImage(imageKey, blob);
       }
-      return updated;
-    });
+
+      // Remove base64 data before storing in localStorage
+      storageRecord.base64Images = newRecord.base64Images.map((_, index) =>
+        `${newRecord.id}_${index}`
+      );
+
+      // Update metadata in local storage 
+      setHistory((prev) => {
+        const updated = [storageRecord, ...prev];
+        if (updated.length > MAX_HISTORY_LENGTH) {
+          const oldest = updated.pop();
+          if (oldest) {
+            // Delete all images associated with the oldest record
+            (async () => {
+              try {
+                // Delete each image for the record
+                for (const imageKey of oldest.base64Images) {
+                  await deleteImage(imageKey);
+                }
+              } catch (error) {
+                console.error(`Failed to delete oldest record images:`, error);
+              }
+            })();
+          }
+        }
+        return updated;
+      });
+    } catch (error) {
+      console.error('Failed to save images:', error);
+      throw error; // Re-throw to handle in the UI
+    }
   }
 
-  const deleteRecords = (ids: string[]) => {
+  const deleteRecords = async (ids: string[]) => {
+    // Delete images from IndexedDB first
+    for (const id of ids) {
+      const record = history.find(r => r.id === id)
+      if (record) {
+        // Delete all images associated with this record
+        try {
+          for (const imageKey of record.base64Images) {
+            await deleteImage(imageKey);
+          }
+        } catch (error) {
+          console.error(`Failed to delete images for record ${id}:`, error)
+        }
+      }
+    }
+
+    // Then update the history in localStorage
     setHistory(history.filter((record) => !ids.includes(record.id)))
   }
 
