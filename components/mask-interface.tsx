@@ -95,7 +95,7 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
         }
     }, [ctx, originalImage, maskCanvas, renderCanvas])
 
-    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
         setIsDrawing(true)
         draw(e)
     }
@@ -104,12 +104,22 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
         setIsDrawing(false)
     }
 
-    const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
         if (!isDrawing || !ctx || !canvasRef.current || !originalImage || !maskCtx) return
 
         const rect = canvasRef.current.getBoundingClientRect()
-        const x = (e.clientX - rect.left) * (canvasRef.current.width / rect.width)
-        const y = (e.clientY - rect.top) * (canvasRef.current.height / rect.height)
+        let x, y
+
+        if ('touches' in e) {
+            // Touch event
+            const touch = e.touches[0]
+            x = (touch.clientX - rect.left) * (canvasRef.current.width / rect.width)
+            y = (touch.clientY - rect.top) * (canvasRef.current.height / rect.height)
+        } else {
+            // Mouse event
+            x = (e.clientX - rect.left) * (canvasRef.current.width / rect.width)
+            y = (e.clientY - rect.top) * (canvasRef.current.height / rect.height)
+        }
 
         // Draw on the mask (make transparent where user draws)
         maskCtx.globalCompositeOperation = "destination-out"
@@ -180,6 +190,9 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
                                 onMouseUp={stopDrawing}
                                 onMouseOut={stopDrawing}
                                 onMouseMove={draw}
+                                onTouchStart={startDrawing}
+                                onTouchEnd={stopDrawing}
+                                onTouchMove={draw}
                             />
                         </div>
                         <div className="bg-background/80 p-2 text-xs text-center rounded-lg">
