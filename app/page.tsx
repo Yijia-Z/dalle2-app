@@ -8,14 +8,37 @@ import { useTheme } from "next-themes"
 import { useLocalStorage } from "@/lib/use-local-storage"
 import type { GenerationRecord } from "@/lib/types"
 import { useState } from "react"
+import { saveImage, getImage, deleteImage } from "@/lib/indexeddb"
 
 export default function Home() {
   const [history, setHistory] = useLocalStorage<GenerationRecord[]>("history", [])
   const { setTheme, theme } = useTheme()
   const [selectedRecord, setSelectedRecord] = useState<GenerationRecord | undefined>(undefined)
+  const MAX_HISTORY_LENGTH = 100; // Set a limit for the number of records
 
-  const updateHistory = (newRecord: GenerationRecord) => {
-    setHistory([newRecord, ...history])
+  const updateHistory = async (newRecord: GenerationRecord) => {
+    // Save images to IndexedDB
+    for (const base64Image of newRecord.base64Images) {
+      // Convert base64 string to Blob before saving
+      const response = await fetch(base64Image);
+      const blob = await response.blob();
+      await saveImage(newRecord.id, blob);
+    }
+
+    // Update metadata in local storage 
+    setHistory((prev) => {
+      const updated = [newRecord, ...prev];
+      if (updated.length > MAX_HISTORY_LENGTH) {
+        const oldest = updated.pop();
+        if (oldest) {
+          // Delete all images associated with the oldest record
+          oldest.base64Images.forEach(async () => {
+            await deleteImage(oldest.id);
+          });
+        }
+      }
+      return updated;
+    });
   }
 
   const deleteRecords = (ids: string[]) => {

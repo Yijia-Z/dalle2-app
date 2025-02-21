@@ -167,6 +167,12 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
     return calculateCost(size, numImages).toFixed(3)
   }
 
+  const handleSelectAsUpload = (base64Image: string) => {
+    setUploadedImage(base64Image)
+    setMode("variation")
+    setResults([])
+  }
+
   return (
     <ScrollArea className="h-[calc(87vh)] -mr-4">
       <div className="space-y-6 pr-4">
@@ -193,7 +199,11 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
 
           {selectedRecord && (
             <div className="flex justify-between items-center">
-              <div className="text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-lg">
+                <Eye />
+                {selectedRecord.type === "generate" && <Sparkles />}
+                {selectedRecord.type === "variation" && <Images />}
+                {selectedRecord.type === "edit" && <Edit />}
                 Viewing saved {selectedRecord.type} request
               </div>
               <Button
@@ -500,6 +510,13 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                     onClick={() => handleDownload(base64Image, index)}
                   >
                     <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleSelectAsUpload(base64Image)}
+                  >
+                    <ImagePlus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

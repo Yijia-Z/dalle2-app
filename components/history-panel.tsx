@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Download, Trash2, CheckSquare, Square, ArrowLeftRight, Eye, History, Edit, Images, Sparkles, CheckCheck } from "lucide-react"
 import type { GenerationRecord } from "@/lib/types"
 import Image from "next/image"
@@ -212,7 +211,7 @@ export function HistoryPanel({ history, onDelete, onSelect, className = "" }: Hi
                       {record.type === "edit" && <Edit className="h-4 w-4 text-primary" />}
                       <p className="font-medium">{record.type.charAt(0).toUpperCase() + record.type.slice(1)}</p>
                     </div>
-                    {record.prompt && <p className="text-sm text-muted-foreground truncate">{record.prompt}</p>}
+                    {record.prompt && <p className="text-sm text-muted-foreground break-words">{record.prompt}</p>}
                     <p className="text-xs text-muted-foreground mt-1">
                       Size: {record.size} | Cost: ${record.cost.toFixed(3)} | Images: {record.n}
                     </p>
