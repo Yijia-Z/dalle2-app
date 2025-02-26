@@ -44,7 +44,7 @@ export function HistoryPanel({ history, onDelete, onSelect, className = "" }: Hi
     }
 
     loadImages()
-  }, [history])
+  }, [history, imageCache])
 
   const isAllSelected = history.length > 0 && selectedIds.length === history.length
   const toggleSelectAll = () => {

@@ -8,7 +8,7 @@ import { useTheme } from "next-themes"
 import { useLocalStorage } from "@/lib/use-local-storage"
 import type { GenerationRecord } from "@/lib/types"
 import { useState } from "react"
-import { saveImage, getImage, deleteImage } from "@/lib/indexeddb"
+import { saveImage, deleteImage } from "@/lib/indexeddb"
 
 export default function Home() {
   const [history, setHistory] = useLocalStorage<GenerationRecord[]>("history", [])

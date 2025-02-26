@@ -1,9 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Button } from "./ui/button"
-import { Slider } from "./ui/slider"
-import { Label } from "./ui/label"
+import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
+import { Label } from "@/components/ui/label"
 
 interface MaskInterfaceProps {
     image: string
