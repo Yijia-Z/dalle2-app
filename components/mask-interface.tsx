@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
+import { ScrollArea } from "./ui/scroll-area"
 
 interface MaskInterfaceProps {
     image: string
@@ -186,7 +187,7 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
     }, [maskCanvas, onMaskComplete])
 
     return (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xs">
             <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg">
                 <div className="space-y-4">
                     <div className="flex items-center gap-4">
@@ -204,39 +205,34 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <div
-                            className="relative space-y-2"
-                            style={{
-                                maxHeight: "calc(70vh - 80px)", // Adjust 80px based on header/footer height
-                                maxWidth: "100%",
-                                overflow: "auto", // Add scroll if needed
-                            }}
-                        >
-                            <div className="relative w-full h-auto" /* Ensure inner div resizes */ >
-                                <canvas
-                                    ref={canvasRef}
-                                    width={canvasSize.width}
-                                    height={canvasSize.height}
-                                    style={{
-                                        width: "100%",
-                                        height: "auto",
-                                        aspectRatio: canvasSize.width ? `${canvasSize.width}/${canvasSize.height}` : "1",
-                                        cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize * (1024 / canvasSize.width)}' height='${brushSize * (1024 / canvasSize.width)}'><circle cx='${brushSize * (1024 / canvasSize.width) / 2}' cy='${brushSize * (1024 / canvasSize.width) / 2}' r='${brushSize * (1024 / canvasSize.width) / 2}' fill='rgba(0,0,0,0.3)' stroke='white' stroke-width='1'/></svg>") ${brushSize * (1024 / canvasSize.width) / 2} ${brushSize * (1024 / canvasSize.width) / 2}, auto`
-                                    }}
-                                    className="touch-none border rounded-lg"
-                                    onMouseDown={startDrawing}
-                                    onMouseUp={stopDrawing}
-                                    onMouseOut={stopDrawing}
-                                    onMouseMove={draw}
-                                    onTouchStart={startDrawing}
-                                    onTouchEnd={stopDrawing}
-                                    onTouchMove={draw}
-                                />
+                        <ScrollArea className="h-[calc(70vh-80px)] -mr-2">
+                            <div className="relative space-y-2">
+                                <div className="relative w-full h-auto pr-2">
+                                    <canvas
+                                        ref={canvasRef}
+                                        width={canvasSize.width}
+                                        height={canvasSize.height}
+                                        style={{
+                                            width: "100%",
+                                            height: "auto",
+                                            aspectRatio: canvasSize.width ? `${canvasSize.width}/${canvasSize.height}` : "1",
+                                            cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize * (1024 / canvasSize.width)}' height='${brushSize * (1024 / canvasSize.width)}'><circle cx='${brushSize * (1024 / canvasSize.width) / 2}' cy='${brushSize * (1024 / canvasSize.width) / 2}' r='${brushSize * (1024 / canvasSize.width) / 2}' fill='rgba(0,0,0,0.3)' stroke='white' stroke-width='1'/></svg>") ${brushSize * (1024 / canvasSize.width) / 2} ${brushSize * (1024 / canvasSize.width) / 2}, auto`
+                                        }}
+                                        className="touch-none border rounded-lg"
+                                        onMouseDown={startDrawing}
+                                        onMouseUp={stopDrawing}
+                                        onMouseOut={stopDrawing}
+                                        onMouseMove={draw}
+                                        onTouchStart={startDrawing}
+                                        onTouchEnd={stopDrawing}
+                                        onTouchMove={draw}
+                                    />
+                                </div>
+                                <div className="bg-background/80 p-2 text-xs text-center rounded-lg">
+                                    Paint the areas you want to edit
+                                </div>
                             </div>
-                            <div className="bg-background/80 p-2 text-xs text-center rounded-lg">
-                                Paint the areas you want to edit
-                            </div>
-                        </div>
+                        </ScrollArea>
                     </div>
                     <div className="flex justify-end gap-4">
                         <Button variant="outline" onClick={onCancel}>

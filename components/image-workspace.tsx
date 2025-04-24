@@ -6,7 +6,7 @@ import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Download, Eye, ImagePlus, Sparkles, Loader2, ImageMinus, Images, Edit, Paintbrush, X, Square, Grid2X2, Grid3X3, RectangleHorizontal, RectangleVertical } from "lucide-react"
+import { Download, Eye, ImagePlus, Sparkles, Loader2, ImageMinus, Images, Edit, Paintbrush, X, Square, Grid2X2, Grid3X3, RectangleHorizontal, RectangleVertical, Maximize2 } from "lucide-react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { generateImage, createImageVariation, createImageEdit } from "@/lib/openai"
@@ -19,6 +19,9 @@ import { useLocalStorage } from "@/lib/use-local-storage"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getImageAsDataUrl, saveImage } from "@/lib/indexeddb"
 import { useToast } from "@/hooks/use-toast"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 
 interface ImageWorkspaceProps {
   updateHistory: (newRecord: GenerationRecord) => void
@@ -31,6 +34,8 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
   const { toast } = useToast()
   const [apiKey, setApiKey] = useLocalStorage<string>("apiKey", "")
   const [prompt, setPrompt] = useState("")
+  const [isPromptPopupOpen, setIsPromptPopupOpen] = useState(false)
+  const [popupPromptText, setPopupPromptText] = useState("")
   const [size, setSize] = useState<"256x256" | "512x512" | "1024x1024" | "1536x1024" | "1024x1536" | "auto">(
     model === "dall-e-2" ? "1024x1024" : "auto"
   )
@@ -146,11 +151,43 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!apiKey) return
+  const handlePromptChange = (value: string) => {
+    setPrompt(value);
+  };
 
-    setIsLoading(true)
+  const handlePopupPromptChange = (value: string) => {
+    setPopupPromptText(value);
+  };
+
+  const savePopupPrompt = () => {
+    setPrompt(popupPromptText);
+    setIsPromptPopupOpen(false);
+  };
+
+  const openPromptPopup = () => {
+    setPopupPromptText(prompt);
+    setIsPromptPopupOpen(true);
+  };
+
+  const isPromptOverLimit = (text: string) => {
+    const maxLength = model === "gpt-image-1" ? 32000 : 1000;
+    return text.length > maxLength;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apiKey) return;
+
+    if (mode !== "variation" && isPromptOverLimit(prompt)) {
+      toast({
+        title: "Prompt Too Long",
+        description: `Prompt exceeds the maximum length of ${model === "gpt-image-1" ? "32,000" : "1,000"} characters. Please shorten your prompt.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
     try {
       let response
 
@@ -352,13 +389,19 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
 
   const handleSelectAsUpload = (base64Image: string) => {
     setUploadedImage(base64Image)
-    setMode("variation")
-    setResults([])
+    setResults([]) // Clear previous results
+
+    if (model === "gpt-image-1") {
+      setMode("edit") // Set mode to edit for gpt-image-1
+      setShowMaskInterface(true) // Show mask interface
+    } else {
+      setMode("variation") // Keep variation mode for dall-e-2
+    }
   }
 
   return (
-    <ScrollArea className="h-[calc(87vh)] -mr-4">
-      <div className="space-y-6 pr-4">
+    <ScrollArea className="h-[calc(100vh-72px)]">
+      <div className="space-y-6 p-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* API Key Input */}
           <div className="flex gap-4">
@@ -413,16 +456,32 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
             </div>
           )}
           {uploadedImage ? (
-            <div className="flex gap-4">
-              <Input
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder={mode === "variation" ? "No prompt needed for variations" : "Enter your prompt here"}
-                maxLength={1000}
-                className="flex-1"
-                disabled={mode === "variation"}
-                required={mode === "generate" || mode === "edit"}
-              />
+            <div className="flex gap-4 items-start"> {/* Changed to items-start */}
+              <div className="relative flex-1"> {/* Added relative container */}
+                <Input
+                  value={prompt}
+                  onChange={(e) => handlePromptChange(e.target.value)} // Use handler
+                  placeholder={mode === "variation" ? "No prompt needed for variations" : "Enter your prompt here"}
+                  maxLength={model === "gpt-image-1" ? 32000 : 1000} // Dynamic max length
+                  className="flex-1 pr-10" // Adjust padding for the button and character limit
+                  disabled={mode === "variation"}
+                  required={mode === "generate" || mode === "edit"}
+                />
+                <div className={`bg-background absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono ${prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {prompt.length} / {model === "gpt-image-1" ? 32000 : 1000}
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground"
+                  onClick={openPromptPopup}
+                  disabled={mode === "variation"}
+                  aria-label="Edit prompt in popup"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              </div>
               <div className="flex gap-2">
                 <Button
                   type="button"
@@ -451,14 +510,29 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
             </div>
           ) : (
             <div className="flex gap-4">
-              <Input
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Enter your prompt here"
-                maxLength={1000}
-                className="flex-1"
-                required
-              />
+              <div className="relative flex-1"> {/* Added relative container */}
+                <Input
+                  value={prompt}
+                  onChange={(e) => handlePromptChange(e.target.value)} // Use handler
+                  placeholder="Enter your prompt here"
+                  maxLength={model === "gpt-image-1" ? 32000 : 1000} // Dynamic max length
+                  className="flex-1 pr-10" // Adjust padding for the button and character limit
+                  required
+                />
+                <div className={`bg-background absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono ${prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {prompt.length} / {model === "gpt-image-1" ? 32000 : 1000}
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground"
+                  onClick={openPromptPopup}
+                  aria-label="Edit prompt in popup"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              </div>
               <Button
                 type="button"
                 variant="outline"
@@ -663,11 +737,15 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                   <span className="hidden md:inline">Processing...</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4" />
                   <span className="hidden md:inline">
                     Generate
-                    {getEstimatedCost() ? ` $${getEstimatedCost()}` : ''}
+                    {getEstimatedCost() && parseFloat(getEstimatedCost()) > 0 && (
+                      <Badge variant="secondary" className="ml-1.5 font-mono text-xs tabular-nums px-1.5 py-0.5">
+                        ${getEstimatedCost()}
+                      </Badge>
+                    )}
                   </span>
                 </div>
               )}
@@ -827,6 +905,41 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
             ))}
           </div>
         )}
+
+        <Dialog open={isPromptPopupOpen} onOpenChange={setIsPromptPopupOpen}>
+          <DialogContent className="sm:max-w-[625px]">
+            <DialogHeader>
+              <DialogTitle>Edit Prompt</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <Textarea
+                value={popupPromptText}
+                onChange={(e) => handlePopupPromptChange(e.target.value)}
+                placeholder="Enter your prompt here"
+                className={cn(
+                  "min-h-[200px] max-h-[60vh] resize-y",
+                  isPromptOverLimit(popupPromptText) && "text-destructive"
+                )}
+              />
+              <div className="text-xs text-right mt-1">
+                <span className={cn(
+                  isPromptOverLimit(popupPromptText) ? "text-destructive" : "text-muted-foreground"
+                )}>
+                  {popupPromptText.length} / {model === "gpt-image-1" ? "32,000" : "1,000"} characters
+                </span>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsPromptPopupOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={savePopupPrompt}>
+                Save Prompt
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </ScrollArea>
   )

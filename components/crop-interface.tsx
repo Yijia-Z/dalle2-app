@@ -61,7 +61,7 @@ export function CropInterface({ image, onCropComplete, onCancel, aspectRatio = 1
     }, [croppedAreaPixels, image, onCropComplete])
 
     return (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xs">
             <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg">
                 <div className="relative h-[400px]">
                     <Cropper

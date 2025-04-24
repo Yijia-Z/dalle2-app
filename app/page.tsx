@@ -10,12 +10,13 @@ import type { GenerationRecord } from "@/lib/types"
 import { useState } from "react"
 import { saveImage, deleteImage } from "@/lib/indexeddb"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AnimatedCharacter } from "@/components/animated-character"
 
 export default function Home() {
   const [history, setHistory] = useLocalStorage<GenerationRecord[]>("history", [])
   const { setTheme, theme } = useTheme()
   const [selectedRecord, setSelectedRecord] = useState<GenerationRecord | undefined>(undefined)
-  const [model, setModel] = useState<"dall-e-2" | "gpt-image-1">("dall-e-2")
+  const [model, setModel] = useState<"dall-e-2" | "gpt-image-1">("gpt-image-1")
   const MAX_HISTORY_LENGTH = 100; // Set a limit for the number of records
 
   const updateHistory = async (newRecord: GenerationRecord) => {
@@ -102,10 +103,10 @@ export default function Home() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-4 space-y-6 max-w-4xl mx-auto">
+      <div className="flex-1 overflow-y-auto bg-background">
+        <div className="max-w-4xl mx-auto ">
           {/* Top Bar */}
-          <div className="flex justify-between items-center">
+          <div className="p-4 pb-0 flex justify-between items-center">
             {/* Mobile History Toggle */}
             <div className="md:hidden pr-4">
               <Sheet>
@@ -128,16 +129,38 @@ export default function Home() {
               <div className="w-4 h-4 bg-blue-600"></div>
             </div>
             <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-semibold hidden md:block">{model === "dall-e-2" ? "DALL·E 2" : "GPT-Image-1"}</h1>
+              <h1 className="text-3xl font-semibold font-mono hidden md:block">
+                {"ImageGen".split("").map((char, index) => (
+                  <AnimatedCharacter key={index}>{char}</AnimatedCharacter>
+                ))}
+              </h1>
               <Select value={model} onValueChange={(value: "dall-e-2" | "gpt-image-1") => setModel(value)}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectLabel>Image Generation Models</SelectLabel>
-                    <SelectItem value="dall-e-2">DALL·E 2</SelectItem>
-                    <SelectItem value="gpt-image-1">GPT-Image-1</SelectItem>
+                    <SelectLabel>Models</SelectLabel>
+                    <SelectItem value="dall-e-2">
+                      <div className="flex items-center gap-2">
+                        <img
+                          src="https://cdn.openai.com/API/docs/images/model-page/model-icons/dall-e-2.png"
+                          alt="DALL·E 2 icon"
+                          className="h-4 w-4"
+                        />
+                        DALL·E 2
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="gpt-image-1">
+                      <div className="flex items-center gap-2">
+                        <img
+                          src="https://cdn.openai.com/API/docs/images/model-page/model-icons/gpt-image-1.png"
+                          alt="GPT Image 1 icon"
+                          className="h-4 w-4"
+                        />
+                        GPT Image 1
+                      </div>
+                    </SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
