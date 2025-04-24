@@ -6,7 +6,7 @@ import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Download, Eye, ImagePlus, Sparkles, Loader2, ImageMinus, Images, Edit, Paintbrush, X, Square, Grid2X2, Grid3X3 } from "lucide-react"
+import { Download, Eye, ImagePlus, Sparkles, Loader2, ImageMinus, Images, Edit, Paintbrush, X, Square, Grid2X2, Grid3X3, RectangleHorizontal, RectangleVertical } from "lucide-react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { generateImage, createImageVariation, createImageEdit } from "@/lib/openai"
@@ -17,28 +17,39 @@ import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useLocalStorage } from "@/lib/use-local-storage"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getImageAsDataUrl } from "@/lib/indexeddb"
+import { getImageAsDataUrl, saveImage } from "@/lib/indexeddb"
+import { useToast } from "@/hooks/use-toast"
 
 interface ImageWorkspaceProps {
   updateHistory: (newRecord: GenerationRecord) => void
   selectedRecord?: GenerationRecord
   onClearSelection: () => void
+  model: "dall-e-2" | "gpt-image-1"
 }
 
-export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection }: ImageWorkspaceProps) {
+export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection, model }: ImageWorkspaceProps) {
+  const { toast } = useToast()
   const [apiKey, setApiKey] = useLocalStorage<string>("apiKey", "")
   const [prompt, setPrompt] = useState("")
-  const [size, setSize] = useState<"256x256" | "512x512" | "1024x1024">("1024x1024")
+  const [size, setSize] = useState<"256x256" | "512x512" | "1024x1024" | "1536x1024" | "1024x1536" | "auto">(
+    model === "dall-e-2" ? "1024x1024" : "auto"
+  )
   const [numImages, setNumImages] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [results, setResults] = useState<string[]>([])
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [mode, setMode] = useState<"generate" | "edit" | "variation">("generate")
   const [mask, setMask] = useState<string | null>(null)
+  const [background, setBackground] = useState<"transparent" | "opaque" | "auto">("auto")
+  const [moderation, setModeration] = useState<"low" | "auto">("low")
+  const [outputCompression, setOutputCompression] = useState(100)
+  const [outputFormat, setOutputFormat] = useState<"png" | "jpeg" | "webp">("png")
+  const [quality, setQuality] = useState<"auto" | "high" | "medium" | "low">("high")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showCropper, setShowCropper] = useState(false)
   const [originalImageFile, setOriginalImageFile] = useState<string | null>(null)
   const [showMaskInterface, setShowMaskInterface] = useState(false)
+  const [imageAspectRatio, setImageAspectRatio] = useState(1);
 
   useEffect(() => {
     if (selectedRecord) {
@@ -74,6 +85,40 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
     }
   }, [selectedRecord])
 
+  // Update size when model changes
+  useEffect(() => {
+    setSize(model === "dall-e-2" ? "1024x1024" : "auto")
+  }, [model])
+
+  // Clear non-reusable fields when model changes
+  useEffect(() => {
+    setUploadedImage(null)
+    setMask(null)
+    setResults([])
+    setMode("generate")
+    setOriginalImageFile(null)
+    setShowCropper(false)
+    setShowMaskInterface(false)
+    onClearSelection()
+  }, [model, onClearSelection])
+
+  // Calculate aspect ratio when uploaded image changes
+  useEffect(() => {
+    if (uploadedImage) {
+      const img = new window.Image();
+      img.onload = () => {
+        setImageAspectRatio(img.naturalWidth / img.naturalHeight);
+      };
+      img.onerror = () => {
+        console.error("Failed to load image for aspect ratio calculation");
+        setImageAspectRatio(1); // Fallback to square on error
+      };
+      img.src = uploadedImage;
+    } else {
+      setImageAspectRatio(1); // Reset to square if no image
+    }
+  }, [uploadedImage]);
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -81,8 +126,14 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
     const reader = new FileReader()
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string
-      setOriginalImageFile(dataUrl)
-      setShowCropper(true)
+      if (model === "gpt-image-1") {
+        setUploadedImage(dataUrl)
+        setMode("edit")
+        setShowMaskInterface(true)
+      } else {
+        setOriginalImageFile(dataUrl)
+        setShowCropper(true)
+      }
     }
     reader.readAsDataURL(file)
   }
@@ -90,7 +141,9 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
   const handleCropComplete = (croppedImage: string) => {
     setUploadedImage(croppedImage)
     setShowCropper(false)
-    setMode("variation")
+    if (model === "dall-e-2") {
+      setMode("variation")
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,11 +155,17 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
       let response
 
       if (mode === "generate") {
-        response = await generateImage(apiKey, prompt, numImages, size)
+        response = await generateImage(apiKey, prompt, numImages, size, model, {
+          background,
+          moderation,
+          outputCompression,
+          outputFormat,
+          quality
+        })
       } else if (mode === "variation" && uploadedImage) {
-        response = await createImageVariation(apiKey, uploadedImage, numImages, size)
+        response = await createImageVariation(apiKey, uploadedImage, numImages, size, model)
       } else if (mode === "edit" && uploadedImage && mask) {
-        response = await createImageEdit(apiKey, uploadedImage, mask, prompt, numImages, size)
+        response = await createImageEdit(apiKey, uploadedImage, mask, prompt, numImages, size, model)
       } else {
         throw new Error("Invalid mode or missing data")
       }
@@ -116,35 +175,144 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
       )
       setResults(base64Images)
 
+      // Display token usage toast for gpt-image-1
+      let totalCost = calculateCost(size, numImages, model, quality); // Calculate output cost first
+      let inputTokenCost = 0; // Initialize input cost
+
+      if (model === "gpt-image-1" && response.usage) {
+        const inputTokens = response.usage.input_tokens || 0; // Ensure input_tokens exists
+        inputTokenCost = (inputTokens / 1_000_000) * 10.00;
+        totalCost += inputTokenCost; // Add input cost to total cost
+
+        const outputCost = totalCost - inputTokenCost; // Recalculate output cost for the toast
+
+        toast({
+          title: "GPT-Image-1 Usage",
+          description: `Input Cost: $${inputTokenCost.toFixed(3)}, Output Cost: $${outputCost.toFixed(3)}, Total Cost: $${totalCost.toFixed(3)} (Input: ${inputTokens}, Output: ${response.usage.output_tokens}, Total: ${response.usage.total_tokens} tokens)`,
+        })
+      } else if (model === "dall-e-2") {
+        // Optional: Toast for DALL-E 2 cost
+        toast({
+          title: "DALL·E 2 Usage",
+          description: `Total Cost: $${totalCost.toFixed(3)}`,
+        })
+      }
+
       const newRecord: GenerationRecord = {
         id: Date.now().toString(),
         type: mode,
         prompt: mode !== "variation" ? prompt : undefined,
         size,
-        base64Images,
-        requestTime: Date.now(),
+        base64Images, // Will be replaced by keys before saving to local storage
+        requestTime: response.created * 1000, // Use API timestamp
         n: numImages,
-        cost: calculateCost(size, numImages),
-        createdAt: Date.now(),
-        originalImage: uploadedImage || undefined,
-        maskImage: mask || undefined,
+        cost: totalCost, // Store the final total cost (output + input)
+        createdAt: Date.now(), // Keep local timestamp for sorting
+        originalImage: undefined, // Placeholder, will be added later if needed
+        maskImage: undefined, // Placeholder
+        model,
+        // Store usage details if available, especially for gpt-image-1
+        usage: response.usage ? {
+          input_tokens: response.usage.input_tokens,
+          input_tokens_details: response.usage.input_tokens_details,
+          output_tokens: response.usage.output_tokens,
+          total_tokens: response.usage.total_tokens,
+        } : undefined,
       }
-      updateHistory(newRecord)
+
+      // Add original/mask image keys before saving to history
+      try {
+        if (mode !== 'generate' && uploadedImage) {
+          const originalKey = `${newRecord.id}_original`;
+          await saveImageFromDataUrl(originalKey, uploadedImage);
+          newRecord.originalImage = originalKey;
+        }
+        if (mode === 'edit' && mask) {
+          const maskKey = `${newRecord.id}_mask`;
+          await saveImageFromDataUrl(maskKey, mask);
+          newRecord.maskImage = maskKey;
+        }
+        // Now pass the complete record (with image keys) to updateHistory
+        await updateHistory(newRecord);
+      } catch (saveError) {
+        console.error("Error saving images to IndexedDB:", saveError);
+        toast({
+          title: "Error Saving Images",
+          description: "Could not save generated images locally. Check console for details.",
+          variant: "destructive",
+        });
+        // Decide if you still want to update history without images, maybe with a flag
+        // For now, we proceed to update history metadata but images might be missing
+        // await updateHistory({ ...newRecord, base64Images: [] }); // Example: update without images
+      }
+
     } catch (error) {
-      console.error("Error:", error)
-      // TODO: Add error handling UI
+      console.error("Error during generation:", error)
+      toast({
+        title: "Generation Error",
+        description: error instanceof Error ? error.message : "An unknown error occurred.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
   }
 
-  const calculateCost = (size: string, n: number) => {
-    const costMap = {
-      "256x256": 0.016,
-      "512x512": 0.018,
-      "1024x1024": 0.02,
+  // Helper function to save data URL to IndexedDB
+  const saveImageFromDataUrl = async (key: string, dataUrl: string) => {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    await saveImage(key, blob);
+  };
+
+  const calculateCost = (size: string, n: number, model: string, quality: string = "auto") => {
+    if (model === "gpt-image-1") {
+      const gptImage1Costs = {
+        low: {
+          "1024x1024": 0.011,
+          "1024x1536": 0.016,
+          "1536x1024": 0.016,
+          auto: 0.011, // Default to lowest cost if size is auto
+        },
+        medium: {
+          "1024x1024": 0.042,
+          "1024x1536": 0.063,
+          "1536x1024": 0.063,
+          auto: 0.042, // Default to medium 1024x1024 if size is auto
+        },
+        high: {
+          "1024x1024": 0.167,
+          "1024x1536": 0.250,
+          "1536x1024": 0.250,
+          auto: 0.167, // Default to high 1024x1024 if size is auto
+        },
+        auto: {
+          // Default to medium quality if quality is auto
+          "1024x1024": 0.042,
+          "1024x1536": 0.063,
+          "1536x1024": 0.063,
+          auto: 0.042, // Default to medium 1024x1024
+        }
+      };
+
+      const effectiveQuality = (quality === "auto" ? "medium" : quality) as keyof typeof gptImage1Costs;
+      const effectiveSize = size as keyof typeof gptImage1Costs[typeof effectiveQuality];
+
+      const costPerImage = gptImage1Costs[effectiveQuality]?.[effectiveSize] ?? gptImage1Costs.auto.auto; // Fallback to absolute default
+
+      return costPerImage * n;
+
+    } else if (model === "dall-e-2") {
+      const costMap = {
+        "256x256": 0.016,
+        "512x512": 0.018,
+        "1024x1024": 0.02,
+        auto: 0.02 // Default for DALL-E 2 if size is 'auto'
+      }
+      return (costMap[size as keyof typeof costMap] ?? costMap.auto) * n
+    } else {
+      return 0; // Unknown model
     }
-    return costMap[size as keyof typeof costMap] * n
   }
 
   const handleModeChange = (newMode: "variation" | "edit") => {
@@ -179,7 +347,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
   }
 
   const getEstimatedCost = () => {
-    return calculateCost(size, numImages).toFixed(3)
+    return calculateCost(size, numImages, model, quality).toFixed(3)
   }
 
   const handleSelectAsUpload = (base64Image: string) => {
@@ -205,6 +373,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
 
           {/* Hidden file input - moved outside conditionals */}
           <input
+            key={model}
             ref={fileInputRef}
             type="file"
             accept="image/png"
@@ -233,6 +402,9 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                   setMask(null)
                   setResults([])
                   onClearSelection()
+                  setShowMaskInterface(false)
+                  setShowCropper(false)
+                  setOriginalImageFile(null)
                 }}
               >
                 <X className="h-4 w-4" />
@@ -269,6 +441,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                     setUploadedImage(null)
                     setMask(null)
                     setMode("generate")
+                    setShowMaskInterface(false)
                   }}
                 >
                   <ImageMinus className="h-4 w-4" />
@@ -305,36 +478,41 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                   <div className="text-sm font-medium">
                     {mode === "variation" ? "Image to Vary" : "Mask Preview"}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant={mode === "variation" ? "default" : "outline"}
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => handleModeChange("variation")}
-                    >
-                      <Images className="h-4 w-4" />
-                      <span className="hidden md:inline">Variation</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={mode === "edit" ? "default" : "outline"}
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => handleModeChange("edit")}
-                    >
-                      <Edit className="h-4 w-4" />
-                      <span className="hidden md:inline">Edit</span>
-                    </Button>
-                  </div>
+                  {model === "dall-e-2" && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant={mode === "variation" ? "default" : "outline"}
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => handleModeChange("variation")}
+                      >
+                        <Images className="h-4 w-4" />
+                        <span className="hidden md:inline">Variation</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={mode === "edit" ? "default" : "outline"}
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => handleModeChange("edit")}
+                      >
+                        <Edit className="h-4 w-4" />
+                        <span className="hidden md:inline">Edit</span>
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div
                     className={cn(
-                      "relative border rounded-lg overflow-hidden bg-checkerboard aspect-square w-full group/preview",
+                      "relative border rounded-lg overflow-hidden bg-checkerboard w-full group/preview",
                       mode === "edit" && "cursor-pointer hover:ring-2 hover:ring-primary"
                     )}
-                    style={{ maxWidth: window?.innerWidth < 640 ? "100%" : "min(256px, 100%)" }}
+                    style={{
+                      aspectRatio: imageAspectRatio,
+                      maxWidth: window?.innerWidth < 640 ? "100%" : "min(256px, 100%)"
+                    }}
                     onClick={() => mode === "edit" && setShowMaskInterface(true)}
                   >
                     <Image
@@ -364,7 +542,10 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                     ) : (
                       <>
                         <div className="font-medium text-foreground mb-1">Edit Mode</div>
-                        Click the image to edit the mask. Areas you paint will be edited based on the prompt.
+                        {model === 'gpt-image-1' ?
+                          "Click the image to edit the mask. Areas you paint will be edited based on the prompt." :
+                          "Click the image to edit the mask (if supported) or generate variations. Areas you paint will be edited based on the prompt."
+                        }
                       </>
                     )}
                   </div>
@@ -415,31 +596,62 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
               </div>
             </div>
             <div className="w-32">
-              <Select value={size} onValueChange={(value: "256x256" | "512x512" | "1024x1024") => setSize(value)}>
+              <Select value={size} onValueChange={(value: "256x256" | "512x512" | "1024x1024" | "1536x1024" | "1024x1536" | "auto") => setSize(value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select size" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectLabel>Image Size</SelectLabel>
-                    <SelectItem value="256x256">
-                      <div className="flex items-center gap-2">
-                        <Square className="h-4 w-4" />
-                        <span>256px</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="512x512">
-                      <div className="flex items-center gap-2">
-                        <Grid2X2 className="h-4 w-4" />
-                        <span>512px</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="1024x1024">
-                      <div className="flex items-center gap-2">
-                        <Grid3X3 className="h-4 w-4" />
-                        <span>1024px</span>
-                      </div>
-                    </SelectItem>
+                    {model === "dall-e-2" ? (
+                      <>
+                        <SelectItem value="256x256">
+                          <div className="flex items-center gap-2">
+                            <Square className="h-4 w-4" />
+                            <span>256px</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="512x512">
+                          <div className="flex items-center gap-2">
+                            <Grid2X2 className="h-4 w-4" />
+                            <span>512px</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="1024x1024">
+                          <div className="flex items-center gap-2">
+                            <Grid3X3 className="h-4 w-4" />
+                            <span>1024px</span>
+                          </div>
+                        </SelectItem>
+                      </>
+                    ) : (
+                      <>
+                        <SelectItem value="1024x1024">
+                          <div className="flex items-center gap-2">
+                            <Grid3X3 className="h-4 w-4" />
+                            <span>Square</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="1536x1024">
+                          <div className="flex items-center gap-2">
+                            <RectangleHorizontal className="h-4 w-4" />
+                            <span>Landscape</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="1024x1536">
+                          <div className="flex items-center gap-2">
+                            <RectangleVertical className="h-4 w-4" />
+                            <span>Portrait</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="auto">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4" />
+                            <span>Auto</span>
+                          </div>
+                        </SelectItem>
+                      </>
+                    )}
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -461,6 +673,75 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
               )}
             </Button>
           </div>
+
+          {/* Model-specific options */}
+          {model === "gpt-image-1" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Background</label>
+                <Select value={background} onValueChange={(value: "transparent" | "opaque" | "auto") => setBackground(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select background" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto</SelectItem>
+                    <SelectItem value="transparent">Transparent</SelectItem>
+                    <SelectItem value="opaque">Opaque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Moderation</label>
+                <Select value={moderation} onValueChange={(value: "low" | "auto") => setModeration(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select moderation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Output Format</label>
+                <Select value={outputFormat} onValueChange={(value: "png" | "jpeg" | "webp") => setOutputFormat(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="png">PNG</SelectItem>
+                    <SelectItem value="jpeg">JPEG</SelectItem>
+                    <SelectItem value="webp">WebP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Quality</label>
+                <Select value={quality} onValueChange={(value: "auto" | "high" | "medium" | "low") => setQuality(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select quality" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {outputFormat !== 'png' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Output Compression ({outputCompression}%)</label>
+                  <Slider
+                    value={[outputCompression]}
+                    onValueChange={([value]) => setOutputCompression(value)}
+                    min={0}
+                    max={100}
+                    step={1}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </form>
 
         {showCropper && originalImageFile && (
@@ -484,7 +765,9 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
             onCancel={() => {
               setShowMaskInterface(false)
               if (!mask) {
-                setMode("variation")
+                if (model === "dall-e-2") {
+                  setMode("variation")
+                }
               }
             }}
           />

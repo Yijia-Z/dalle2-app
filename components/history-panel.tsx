@@ -241,7 +241,7 @@ export function HistoryPanel({ history, onDelete, onSelect, className = "" }: Hi
                     </div>
                     {record.prompt && <p className="text-sm text-muted-foreground break-words">{record.prompt}</p>}
                     <p className="text-xs text-muted-foreground mt-1">
-                      Size: {record.size} | Cost: ${record.cost.toFixed(3)} | Images: {record.n}
+                      Size: {record.size} | Cost: ${record.cost.toFixed(3)} | Images: {record.n} | Model: {record.model === "dall-e-2" ? "DALL·E 2" : "GPT-Image-1"}
                     </p>
                   </div>
                 </div>

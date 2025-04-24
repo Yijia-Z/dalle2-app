@@ -9,11 +9,13 @@ import { useLocalStorage } from "@/lib/use-local-storage"
 import type { GenerationRecord } from "@/lib/types"
 import { useState } from "react"
 import { saveImage, deleteImage } from "@/lib/indexeddb"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function Home() {
   const [history, setHistory] = useLocalStorage<GenerationRecord[]>("history", [])
   const { setTheme, theme } = useTheme()
   const [selectedRecord, setSelectedRecord] = useState<GenerationRecord | undefined>(undefined)
+  const [model, setModel] = useState<"dall-e-2" | "gpt-image-1">("dall-e-2")
   const MAX_HISTORY_LENGTH = 100; // Set a limit for the number of records
 
   const updateHistory = async (newRecord: GenerationRecord) => {
@@ -125,7 +127,21 @@ export default function Home() {
               <div className="w-4 h-4 bg-red-400"></div>
               <div className="w-4 h-4 bg-blue-600"></div>
             </div>
-            <h1 className="text-3xl font-semibold hidden md:block">DALL·E 2</h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-semibold hidden md:block">{model === "dall-e-2" ? "DALL·E 2" : "GPT-Image-1"}</h1>
+              <Select value={model} onValueChange={(value: "dall-e-2" | "gpt-image-1") => setModel(value)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Image Generation Models</SelectLabel>
+                    <SelectItem value="dall-e-2">DALL·E 2</SelectItem>
+                    <SelectItem value="gpt-image-1">GPT-Image-1</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="flex items-center gap-2 ml-auto">
               <a
@@ -157,6 +173,7 @@ export default function Home() {
             updateHistory={updateHistory}
             selectedRecord={selectedRecord}
             onClearSelection={clearSelection}
+            model={model}
           />
         </div>
       </div>

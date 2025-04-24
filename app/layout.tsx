@@ -7,8 +7,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "DALL·E 2 by 馬睪",
-  description: "A minimal web application for DALL·E 2 image generation",
+  title: "DALL·E 2 & GPT-Image-1 by 馬睪",
+  description: "A minimal web application for DALL·E 2 and GPT-Image-1 image generation",
 }
 
 export default function RootLayout({

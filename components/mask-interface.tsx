@@ -20,6 +20,7 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
     const [maskCtx, setMaskCtx] = useState<CanvasRenderingContext2D | null>(null)
     const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
     const [brushSize, setBrushSize] = useState(20)
+    const [lastPoint, setLastPoint] = useState<{ x: number; y: number } | null>(null)
 
     const renderCanvas = useCallback(() => {
         if (!ctx || !canvasRef.current || !originalImage || !maskCanvas) return
@@ -96,36 +97,65 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
     }, [ctx, originalImage, maskCanvas, renderCanvas])
 
     const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        if (!maskCtx || !canvasRef.current) return
         setIsDrawing(true)
-        draw(e)
-    }
-
-    const stopDrawing = () => {
-        setIsDrawing(false)
-    }
-
-    const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-        if (!isDrawing || !ctx || !canvasRef.current || !originalImage || !maskCtx) return
 
         const rect = canvasRef.current.getBoundingClientRect()
         let x, y
 
         if ('touches' in e) {
-            // Touch event
             const touch = e.touches[0]
             x = (touch.clientX - rect.left) * (canvasRef.current.width / rect.width)
             y = (touch.clientY - rect.top) * (canvasRef.current.height / rect.height)
         } else {
-            // Mouse event
             x = (e.clientX - rect.left) * (canvasRef.current.width / rect.width)
             y = (e.clientY - rect.top) * (canvasRef.current.height / rect.height)
         }
 
-        // Draw on the mask (make transparent where user draws)
+        // Draw initial point
         maskCtx.globalCompositeOperation = "destination-out"
         maskCtx.beginPath()
         maskCtx.arc(x, y, brushSize, 0, Math.PI * 2)
         maskCtx.fill()
+
+        setLastPoint({ x, y })
+        renderCanvas()
+    }
+
+    const stopDrawing = () => {
+        setIsDrawing(false)
+        setLastPoint(null)
+    }
+
+    const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        if (!isDrawing || !ctx || !canvasRef.current || !originalImage || !maskCtx || !lastPoint) return
+
+        const rect = canvasRef.current.getBoundingClientRect()
+        let currentX, currentY
+
+        if ('touches' in e) {
+            // Touch event
+            const touch = e.touches[0]
+            currentX = (touch.clientX - rect.left) * (canvasRef.current.width / rect.width)
+            currentY = (touch.clientY - rect.top) * (canvasRef.current.height / rect.height)
+        } else {
+            // Mouse event
+            currentX = (e.clientX - rect.left) * (canvasRef.current.width / rect.width)
+            currentY = (e.clientY - rect.top) * (canvasRef.current.height / rect.height)
+        }
+
+        // Draw line from last point to current point on the mask
+        maskCtx.globalCompositeOperation = "destination-out"
+        maskCtx.lineWidth = brushSize * 2 // Use diameter for line width
+        maskCtx.lineCap = "round"
+        maskCtx.lineJoin = "round"
+        maskCtx.beginPath()
+        maskCtx.moveTo(lastPoint.x, lastPoint.y)
+        maskCtx.lineTo(currentX, currentY)
+        maskCtx.stroke()
+
+        // Update the last point
+        setLastPoint({ x: currentX, y: currentY })
 
         // Render the updated state
         renderCanvas()
@@ -174,29 +204,38 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <div>
-                            <canvas
-                                ref={canvasRef}
-                                width={canvasSize.width}
-                                height={canvasSize.height}
-                                style={{
-                                    width: "100%",
-                                    height: "auto",
-                                    aspectRatio: canvasSize.width ? `${canvasSize.width}/${canvasSize.height}` : "1",
-                                    cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize * (1024 / canvasSize.width)}' height='${brushSize * (1024 / canvasSize.width)}'><circle cx='${brushSize * (1024 / canvasSize.width) / 2}' cy='${brushSize * (1024 / canvasSize.width) / 2}' r='${brushSize * (1024 / canvasSize.width) / 2}' fill='rgba(0,0,0,0.3)' stroke='white' stroke-width='1'/></svg>") ${brushSize * (1024 / canvasSize.width) / 2} ${brushSize * (1024 / canvasSize.width) / 2}, auto`
-                                }}
-                                className="touch-none border rounded-lg"
-                                onMouseDown={startDrawing}
-                                onMouseUp={stopDrawing}
-                                onMouseOut={stopDrawing}
-                                onMouseMove={draw}
-                                onTouchStart={startDrawing}
-                                onTouchEnd={stopDrawing}
-                                onTouchMove={draw}
-                            />
-                        </div>
-                        <div className="bg-background/80 p-2 text-xs text-center rounded-lg">
-                            Paint the areas you want to edit
+                        <div
+                            className="relative space-y-2"
+                            style={{
+                                maxHeight: "calc(70vh - 80px)", // Adjust 80px based on header/footer height
+                                maxWidth: "100%",
+                                overflow: "auto", // Add scroll if needed
+                            }}
+                        >
+                            <div className="relative w-full h-auto" /* Ensure inner div resizes */ >
+                                <canvas
+                                    ref={canvasRef}
+                                    width={canvasSize.width}
+                                    height={canvasSize.height}
+                                    style={{
+                                        width: "100%",
+                                        height: "auto",
+                                        aspectRatio: canvasSize.width ? `${canvasSize.width}/${canvasSize.height}` : "1",
+                                        cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize * (1024 / canvasSize.width)}' height='${brushSize * (1024 / canvasSize.width)}'><circle cx='${brushSize * (1024 / canvasSize.width) / 2}' cy='${brushSize * (1024 / canvasSize.width) / 2}' r='${brushSize * (1024 / canvasSize.width) / 2}' fill='rgba(0,0,0,0.3)' stroke='white' stroke-width='1'/></svg>") ${brushSize * (1024 / canvasSize.width) / 2} ${brushSize * (1024 / canvasSize.width) / 2}, auto`
+                                    }}
+                                    className="touch-none border rounded-lg"
+                                    onMouseDown={startDrawing}
+                                    onMouseUp={stopDrawing}
+                                    onMouseOut={stopDrawing}
+                                    onMouseMove={draw}
+                                    onTouchStart={startDrawing}
+                                    onTouchEnd={stopDrawing}
+                                    onTouchMove={draw}
+                                />
+                            </div>
+                            <div className="bg-background/80 p-2 text-xs text-center rounded-lg">
+                                Paint the areas you want to edit
+                            </div>
                         </div>
                     </div>
                     <div className="flex justify-end gap-4">

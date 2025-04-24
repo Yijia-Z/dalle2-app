@@ -10,20 +10,48 @@ function dataURLtoBlob(dataURL: string): Blob {
   return new Blob([u8arr], { type: mime })
 }
 
-export async function generateImage(apiKey: string, prompt: string, n: number, size: string) {
+interface GPTImage1Options {
+  background?: "transparent" | "opaque" | "auto"
+  moderation?: "low" | "auto"
+  outputCompression?: number
+  outputFormat?: "png" | "jpeg" | "webp"
+  quality?: "auto" | "high" | "medium" | "low"
+}
+
+export async function generateImage(
+  apiKey: string,
+  prompt: string,
+  n: number,
+  size: string,
+  model: "dall-e-2" | "gpt-image-1" = "dall-e-2",
+  options?: GPTImage1Options
+) {
+  const body: any = {
+    prompt,
+    n,
+    size,
+    model
+  }
+
+  if (model === "dall-e-2") {
+    body.response_format = "b64_json"
+  }
+
+  if (model === "gpt-image-1") {
+    if (options?.background) body.background = options.background
+    if (options?.moderation) body.moderation = options.moderation
+    if (options?.outputCompression) body.output_compression = options.outputCompression
+    if (options?.outputFormat) body.output_format = options.outputFormat
+    if (options?.quality) body.quality = options.quality
+  }
+
   const response = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      prompt,
-      n,
-      size,
-      model: "dall-e-2",
-      response_format: "b64_json"
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!response.ok) {
@@ -34,15 +62,24 @@ export async function generateImage(apiKey: string, prompt: string, n: number, s
   return response.json()
 }
 
-export async function createImageVariation(apiKey: string, imageDataUrl: string, n: number, size: string) {
+export async function createImageVariation(
+  apiKey: string,
+  imageDataUrl: string,
+  n: number,
+  size: string,
+  model: "dall-e-2" | "gpt-image-1" = "dall-e-2"
+) {
   const blob = dataURLtoBlob(imageDataUrl)
 
   const formData = new FormData()
   formData.append("image", blob, "image.png")
   formData.append("n", n.toString())
   formData.append("size", size)
-  formData.append("model", "dall-e-2")
-  formData.append("response_format", "b64_json")
+  formData.append("model", model)
+
+  if (model === "dall-e-2") {
+    formData.append("response_format", "b64_json")
+  }
 
   const response = await fetch("https://api.openai.com/v1/images/variations", {
     method: "POST",
@@ -67,6 +104,7 @@ export async function createImageEdit(
   prompt: string,
   n: number,
   size: string,
+  model: "dall-e-2" | "gpt-image-1" = "dall-e-2"
 ) {
   const imageBlob = dataURLtoBlob(imageDataUrl)
   const maskBlob = dataURLtoBlob(maskDataUrl)
@@ -77,8 +115,11 @@ export async function createImageEdit(
   formData.append("prompt", prompt)
   formData.append("n", n.toString())
   formData.append("size", size)
-  formData.append("model", "dall-e-2")
-  formData.append("response_format", "b64_json")
+  formData.append("model", model)
+
+  if (model === "dall-e-2") {
+    formData.append("response_format", "b64_json")
+  }
 
   const response = await fetch("https://api.openai.com/v1/images/edits", {
     method: "POST",
