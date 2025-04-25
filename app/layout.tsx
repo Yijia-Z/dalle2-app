@@ -8,8 +8,8 @@ import { Toaster } from "@/components/ui/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "DALL·E 2 & GPT-Image-1 by 馬睪",
-  description: "A minimal web application for DALL·E 2 and GPT-Image-1 image generation",
+  title: "OpenAI ImageGen",
+  description: "DALL·E 2 and GPT-4o image generation",
 }
 
 export default function RootLayout({
