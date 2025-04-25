@@ -108,7 +108,7 @@ export default function Home() {
           {/* Top Bar */}
           <div className="p-4 pb-0 flex justify-between items-center">
             {/* Mobile History Toggle */}
-            <div className="md:hidden pr-4">
+            <div className="md:hidden pr-2">
               <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="outline" size="icon">
@@ -121,7 +121,7 @@ export default function Home() {
               </Sheet>
             </div>
 
-            <div className="flex pr-4">
+            <div className="pr-4 hidden md:flex">
               <div className="w-4 h-4 bg-yellow-200"></div>
               <div className="w-4 h-4 bg-cyan-400"></div>
               <div className="w-4 h-4 bg-green-500"></div>
@@ -135,7 +135,7 @@ export default function Home() {
                 ))}
               </h1>
               <Select value={model} onValueChange={(value: "dall-e-2" | "gpt-image-1") => setModel(value)}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent>

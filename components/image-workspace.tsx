@@ -467,7 +467,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                   disabled={mode === "variation"}
                   required={mode === "generate" || mode === "edit"}
                 />
-                <div className={`bg-background absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono ${prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                <div className={`hidden sm:block bg-background absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono ${prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'text-destructive' : 'text-muted-foreground'}`}>
                   {prompt.length} / {model === "gpt-image-1" ? 32000 : 1000}
                 </div>
                 <Button
@@ -519,7 +519,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                   className="flex-1 pr-10" // Adjust padding for the button and character limit
                   required
                 />
-                <div className={`bg-background absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono ${prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                <div className={`hidden sm:block bg-background absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono ${prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'text-destructive' : 'text-muted-foreground'}`}>
                   {prompt.length} / {model === "gpt-image-1" ? 32000 : 1000}
                 </div>
                 <Button
@@ -754,7 +754,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
 
           {/* Model-specific options */}
           {model === "gpt-image-1" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Background</label>
                 <Select value={background} onValueChange={(value: "transparent" | "opaque" | "auto") => setBackground(value)}>
@@ -781,7 +781,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Output Format</label>
+                <label className="text-sm font-medium">Format</label>
                 <Select value={outputFormat} onValueChange={(value: "png" | "jpeg" | "webp") => setOutputFormat(value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select format" />
