@@ -121,12 +121,19 @@ export default function Home() {
               </Sheet>
             </div>
 
-            <div className="pr-4 hidden md:flex">
-              <div className="w-4 h-4 bg-yellow-200"></div>
-              <div className="w-4 h-4 bg-cyan-400"></div>
-              <div className="w-4 h-4 bg-green-500"></div>
-              <div className="w-4 h-4 bg-red-400"></div>
-              <div className="w-4 h-4 bg-blue-600"></div>
+            <div className="pr-4 hidden sm:flex">
+              <svg xmlns="http://www.w3.org/2000/svg" width="100" height="20" viewBox="0 0 100 20">
+                {["#ffff66", "#42ffff", "#51da4c", "#ff6e3c", "#3c46ff"].map((color, index) => (
+                  <rect
+                    x={index * 20}
+                    width="20"
+                    height="20"
+                    fill={color}
+                    className="animate-pulse"
+                    style={{ animationDelay: `${Math.random() * 2}s` }}
+                  />
+                ))}
+              </svg>
             </div>
             <div className="flex items-center gap-4">
               <h1 className="text-3xl font-semibold font-mono hidden md:block">

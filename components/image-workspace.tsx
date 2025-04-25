@@ -6,7 +6,7 @@ import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Download, Eye, ImagePlus, Sparkles, Loader2, ImageMinus, Images, Edit, Paintbrush, X, Square, Grid2X2, Grid3X3, RectangleHorizontal, RectangleVertical, Maximize2 } from "lucide-react"
+import { Download, Eye, ImagePlus, Sparkles, Loader2, ImageMinus, Images, Edit, Paintbrush, X, Square, Grid2X2, Grid3X3, RectangleHorizontal, RectangleVertical, Maximize2, LoaderPinwheel } from "lucide-react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { generateImage, createImageVariation, createImageEdit } from "@/lib/openai"
@@ -467,14 +467,14 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                   disabled={mode === "variation"}
                   required={mode === "generate" || mode === "edit"}
                 />
-                <div className={`hidden sm:block bg-background absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono ${prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                <Badge className={`p-1 hidden sm:block absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono`} variant={prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'destructive' : undefined}>
                   {prompt.length} / {model === "gpt-image-1" ? 32000 : 1000}
-                </div>
+                </Badge>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground"
                   onClick={openPromptPopup}
                   disabled={mode === "variation"}
                   aria-label="Edit prompt in popup"
@@ -519,14 +519,14 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                   className="flex-1 pr-10" // Adjust padding for the button and character limit
                   required
                 />
-                <div className={`hidden sm:block bg-background absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono ${prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                <Badge className={`p-1 hidden sm:block absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono`} variant={prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'destructive' : undefined}>
                   {prompt.length} / {model === "gpt-image-1" ? 32000 : 1000}
-                </div>
+                </Badge>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground"
                   onClick={openPromptPopup}
                   aria-label="Edit prompt in popup"
                 >
@@ -617,8 +617,8 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                       <>
                         <div className="font-medium text-foreground mb-1">Edit Mode</div>
                         {model === 'gpt-image-1' ?
-                          "Click the image to edit the mask. Areas you paint will be edited based on the prompt." :
-                          "Click the image to edit the mask (if supported) or generate variations. Areas you paint will be edited based on the prompt."
+                          "Click the image to edit the mask. Areas you paint will be edited based on the prompt. If there is no mask, the whole area is subjected to editing." :
+                          "Click the image to edit the mask. Areas you paint will be edited based on the prompt."
                         }
                       </>
                     )}
@@ -856,6 +856,9 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
             {Array.from({ length: numImages }).map((_, index) => (
               <div key={index} className="relative aspect-square">
                 <Skeleton className="w-full h-full rounded-lg" />
+                <div className="absolute inset-0 flex items-center justify-center animate-spin">
+                  <LoaderPinwheel className="h-6 w-6 text-primary" />
+                </div>
               </div>
             ))}
           </div>
