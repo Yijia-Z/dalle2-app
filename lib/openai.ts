@@ -26,7 +26,18 @@ export async function generateImage(
   model: "dall-e-2" | "gpt-image-1" = "dall-e-2",
   options?: GPTImage1Options
 ) {
-  const body: any = {
+  const body: {
+    prompt: string;
+    n: number;
+    size: string;
+    model: "dall-e-2" | "gpt-image-1";
+    response_format?: string;
+    background?: "transparent" | "opaque" | "auto";
+    moderation?: "low" | "auto";
+    output_compression?: number;
+    output_format?: "png" | "jpeg" | "webp";
+    quality?: "auto" | "high" | "medium" | "low";
+  } = {
     prompt,
     n,
     size,

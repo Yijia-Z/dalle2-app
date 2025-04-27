@@ -125,6 +125,7 @@ export default function Home() {
               <svg xmlns="http://www.w3.org/2000/svg" width="100" height="20" viewBox="0 0 100 20">
                 {["#ffff66", "#42ffff", "#51da4c", "#ff6e3c", "#3c46ff"].map((color, index) => (
                   <rect
+                    key={index}
                     x={index * 20}
                     width="20"
                     height="20"

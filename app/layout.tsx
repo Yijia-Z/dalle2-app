@@ -1,19 +1,19 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter, Montserrat, Merriweather } from "next/font/google"
+import { Merriweather } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import AnimatedSquareFavicon from "@/components/animated-square-favicon"
 
-const inter = Merriweather({
+const merriweather = Merriweather({
   subsets: ["latin"],
   weight: "400"
 })
 
 export const metadata: Metadata = {
-  title: "OpenAI ImageGen",
-  description: "DALL·E 2 and GPT-4o image generation",
+  title: "ImageGen",
+  description: "DALL·E 2 and GPT-4o (Gpt Image 1) image generation",
 }
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
       <head>
         <AnimatedSquareFavicon />
       </head>
-      <body className={inter.className}>
+      <body className={merriweather.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />

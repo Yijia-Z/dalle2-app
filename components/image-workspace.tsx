@@ -3,25 +3,25 @@
 import type React from "react"
 import Image from "next/image"
 
-import { useState, useRef, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Download, Eye, ImagePlus, Sparkles, Loader2, ImageMinus, Images, Edit, Paintbrush, X, Square, Grid2X2, Grid3X3, RectangleHorizontal, RectangleVertical, Maximize2, LoaderPinwheel } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Slider } from "@/components/ui/slider"
-import { generateImage, createImageVariation, createImageEdit } from "@/lib/openai"
-import type { GenerationRecord } from "@/lib/types"
+import { Textarea } from "@/components/ui/textarea"
 import { CropInterface } from "./crop-interface"
 import { MaskInterface } from "./mask-interface"
-import { cn } from "@/lib/utils"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useLocalStorage } from "@/lib/use-local-storage"
-import { Skeleton } from "@/components/ui/skeleton"
-import { getImageAsDataUrl, saveImage } from "@/lib/indexeddb"
+import { Download, Edit, Eye, Grid2X2, Grid3X3, ImageMinus, ImagePlus, Images, Loader2, LoaderPinwheel, Maximize2, Paintbrush, RectangleHorizontal, RectangleVertical, Sparkles, Square, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
+import { generateImage, createImageEdit, createImageVariation } from "@/lib/openai"
+import { getImageAsDataUrl, saveImage } from "@/lib/indexeddb"
+import type { GenerationRecord } from "@/lib/types"
+import { useLocalStorage } from "@/lib/use-local-storage"
+import { cn } from "@/lib/utils"
 
 // Constants for validation
 const DALLE2_MAX_SIZE_MB = 4;
@@ -46,32 +46,49 @@ interface ImageWorkspaceProps {
   model: "dall-e-2" | "gpt-image-1"
 }
 
-export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection, model }: ImageWorkspaceProps) {
-  const { toast } = useToast()
-  const [apiKey, setApiKey] = useLocalStorage<string>("apiKey", "")
-  const [prompt, setPrompt] = useState("")
-  const [isPromptPopupOpen, setIsPromptPopupOpen] = useState(false)
-  const [popupPromptText, setPopupPromptText] = useState("")
-  const [size, setSize] = useState<"256x256" | "512x512" | "1024x1024" | "1536x1024" | "1024x1536" | "auto">(
-    model === "dall-e-2" ? "1024x1024" : "auto"
-  )
-  const [numImages, setNumImages] = useState(1)
-  const [isLoading, setIsLoading] = useState(false)
-  const [results, setResults] = useState<string[]>([])
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null)
-  const [additionalImages, setAdditionalImages] = useState<string[] | null>(null); // New state for extra images
-  const [mode, setMode] = useState<"generate" | "edit" | "variation">("generate")
-  const [mask, setMask] = useState<string | null>(null)
-  const [background, setBackground] = useState<"transparent" | "opaque" | "auto">("auto")
-  const [moderation, setModeration] = useState<"low" | "auto">("low")
-  const [outputCompression, setOutputCompression] = useState(100)
-  const [outputFormat, setOutputFormat] = useState<"png" | "jpeg" | "webp">("png")
-  const [quality, setQuality] = useState<"auto" | "high" | "medium" | "low">("high")
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [showCropper, setShowCropper] = useState(false)
-  const [originalImageFile, setOriginalImageFile] = useState<string | null>(null)
-  const [showMaskInterface, setShowMaskInterface] = useState(false)
-  const [imageAspectRatio, setImageAspectRatio] = useState(1);
+export function ImageWorkspace({
+  updateHistory,
+  selectedRecord,
+  onClearSelection,
+  model,
+}: ImageWorkspaceProps) {
+  // Hooks: Toast and Local Storage
+  const { toast } = useToast();
+  const [apiKey, setApiKey] = useLocalStorage<string>("apiKey", "");
+
+  // Prompt and Dialog State
+  const [prompt, setPrompt] = useState("");
+  const [isPromptPopupOpen, setIsPromptPopupOpen] = useState(false);
+  const [popupPromptText, setPopupPromptText] = useState("");
+
+  // Image Generation Parameters
+  const [size, setSize] = useState<
+    "256x256" | "512x512" | "1024x1024" | "1536x1024" | "1024x1536" | "auto"
+  >(model === "dall-e-2" ? "1024x1024" : "auto");
+  const [numImages, setNumImages] = useState(1);
+  const [quality, setQuality] = useState<"auto" | "high" | "medium" | "low">("high");
+  const [background, setBackground] = useState<"transparent" | "opaque" | "auto">("auto");
+  const [moderation, setModeration] = useState<"low" | "auto">("low");
+  const [outputCompression, setOutputCompression] = useState(100);
+  const [outputFormat, setOutputFormat] = useState<"png" | "jpeg" | "webp">("png");
+
+  // UI State
+  const [isLoading, setIsLoading] = useState(false);
+  const [showCropper, setShowCropper] = useState(false);
+  const [showMaskInterface, setShowMaskInterface] = useState(false);
+
+  // Image Data State
+  const [results, setResults] = useState<string[]>([]);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [additionalImages, setAdditionalImages] = useState<string[] | null>(null);
+  const [originalImageFile, setOriginalImageFile] = useState<string | null>(null);
+  const [mask, setMask] = useState<string | null>(null);
+
+  // Mode and Aspect Ratio
+  const [mode, setMode] = useState<"generate" | "edit" | "variation">("generate");
+
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (selectedRecord) {
@@ -114,40 +131,30 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
 
   // Clear non-reusable fields when model changes
   useEffect(() => {
+    // Clear the primary uploaded image
     setUploadedImage(null)
+    // Clear the mask image
     setMask(null)
+    // Clear the generated results
     setResults([])
+    // Reset mode to "generate"
     setMode("generate")
+    // Remove the original image file reference
     setOriginalImageFile(null)
+    // Hide the cropper UI
     setShowCropper(false)
+    // Hide the mask interface
     setShowMaskInterface(false)
+    // Call the provided callback to clear any external selection state
     onClearSelection()
-    setAdditionalImages(null); // Clear additional images too
+    // Clear any additional images
+    setAdditionalImages(null);
   }, [model, onClearSelection])
 
-  // Calculate aspect ratio when the primary uploaded image changes
-  useEffect(() => {
-    if (uploadedImage) {
-      const img = new window.Image();
-      img.onload = () => {
-        setImageAspectRatio(img.naturalWidth / img.naturalHeight);
-      };
-      img.onerror = () => {
-        console.error("Failed to load image for aspect ratio calculation");
-        setImageAspectRatio(1); // Fallback to square on error
-      };
-      img.src = uploadedImage;
-    } else {
-      setImageAspectRatio(1); // Reset to square if no image
-    }
-  }, [uploadedImage]);
-
-  // Updated image upload handler
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const maxSizeBytes = model === 'dall-e-2' ? DALLE2_MAX_SIZE_MB * 1024 * 1024 : GPT_IMAGE_1_MAX_SIZE_MB * 1024 * 1024;
     const allowedTypes = model === 'dall-e-2' ? DALLE2_ALLOWED_TYPES : GPT_IMAGE_1_ALLOWED_TYPES;
     const maxSizeMB = model === 'dall-e-2' ? DALLE2_MAX_SIZE_MB : GPT_IMAGE_1_MAX_SIZE_MB;
 
@@ -505,8 +512,6 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
     }
   }
 
-  // --- New Handlers for Image Management ---
-
   const handleSetPrimaryImage = (index: number) => {
     if (!additionalImages || index < 0 || index >= additionalImages.length || !uploadedImage) return;
 
@@ -524,8 +529,6 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
     setShowMaskInterface(false); // Close mask interface if open
     // Recalculate aspect ratio for the new primary image
     const img = new window.Image();
-    img.onload = () => setImageAspectRatio(img.naturalWidth / img.naturalHeight);
-    img.onerror = () => setImageAspectRatio(1);
     img.src = newPrimary;
   };
 
@@ -540,8 +543,6 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
         setShowMaskInterface(false);
         // Recalculate aspect ratio
         const img = new window.Image();
-        img.onload = () => setImageAspectRatio(img.naturalWidth / img.naturalHeight);
-        img.onerror = () => setImageAspectRatio(1);
         img.src = newPrimary;
       } else {
         // No additional images left, clear everything
@@ -549,7 +550,6 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
         setAdditionalImages(null);
         setMask(null);
         setMode("generate"); // Revert to generate mode
-        setImageAspectRatio(1); // Reset aspect ratio
         setShowMaskInterface(false);
       }
     } else {
@@ -557,10 +557,6 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
       setAdditionalImages(prev => prev ? prev.filter((_, i) => i !== index) : null);
     }
   };
-
-
-  // --- End New Handlers ---
-
 
   return (
     <ScrollArea className="h-[calc(100vh-72px)]">
@@ -674,7 +670,6 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                     setMask(null)
                     setMode("generate")
                     setShowMaskInterface(false)
-                    setImageAspectRatio(1); // Reset aspect ratio
                     // Also reset file input if needed (careful with refs)
                     if (fileInputRef.current) {
                       fileInputRef.current.value = '';
@@ -776,8 +771,14 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                     className="object-contain bg-background"
                     // Only apply mask visualization if mask exists and not in variation mode
                     style={mask && mode !== "variation" ? {
-                      mask: `url(${mask}) center/contain no-repeat`,
-                      WebkitMask: `url(${mask}) center/contain no-repeat`,
+                      maskImage: `url(${mask})`,
+                      WebkitMaskImage: `url(${mask})`,
+                      maskPosition: "center",
+                      WebkitMaskPosition: "center",
+                      maskRepeat: "no-repeat",
+                      WebkitMaskRepeat: "no-repeat",
+                      maskSize: "contain",
+                      WebkitMaskSize: "contain",
                       maskMode: "alpha",
                     } : undefined}
                   />
@@ -1119,7 +1120,6 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
               setUploadedImage(null);
               setAdditionalImages(null);
               setMode("generate");
-              setImageAspectRatio(1);
             }}
           />
         )}
