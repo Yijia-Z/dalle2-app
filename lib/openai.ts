@@ -100,25 +100,32 @@ export async function createImageVariation(
 export async function createImageEdit(
   apiKey: string,
   imageDataUrl: string,
-  maskDataUrl: string,
+  maskDataUrl: string | null,
   prompt: string,
   n: number,
   size: string,
   model: "dall-e-2" | "gpt-image-1" = "dall-e-2"
 ) {
-  const imageBlob = dataURLtoBlob(imageDataUrl)
-  const maskBlob = dataURLtoBlob(maskDataUrl)
+  const imageBlob = dataURLtoBlob(imageDataUrl);
 
-  const formData = new FormData()
-  formData.append("image", imageBlob, "image.png")
-  formData.append("mask", maskBlob, "mask.png")
-  formData.append("prompt", prompt)
-  formData.append("n", n.toString())
-  formData.append("size", size)
-  formData.append("model", model)
+  const formData = new FormData();
+  formData.append("image", imageBlob, "image.png");
+
+  // For DALL-E 2, mask is required. For gpt-image-1, mask is optional.
+  if (model === "dall-e-2" || (model === "gpt-image-1" && maskDataUrl)) {
+    if (maskDataUrl) {
+      const maskBlob = dataURLtoBlob(maskDataUrl);
+      formData.append("mask", maskBlob, "mask.png");
+    }
+  }
+
+  formData.append("prompt", prompt);
+  formData.append("n", n.toString());
+  formData.append("size", size);
+  formData.append("model", model);
 
   if (model === "dall-e-2") {
-    formData.append("response_format", "b64_json")
+    formData.append("response_format", "b64_json");
   }
 
   const response = await fetch("https://api.openai.com/v1/images/edits", {
@@ -127,13 +134,13 @@ export async function createImageEdit(
       Authorization: `Bearer ${apiKey}`,
     },
     body: formData,
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error?.message || "Failed to create image edit")
+    const error = await response.json();
+    throw new Error(error.error?.message || "Failed to create image edit");
   }
 
-  return response.json()
+  return response.json();
 }
 

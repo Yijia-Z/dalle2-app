@@ -23,6 +23,22 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 
+// Constants for validation
+const DALLE2_MAX_SIZE_MB = 4;
+const GPT_IMAGE_1_MAX_SIZE_MB = 25;
+const DALLE2_ALLOWED_TYPES = ['image/png'];
+const GPT_IMAGE_1_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+// Helper function for size validation
+const isFileSizeValid = (file: File, maxSizeMB: number): boolean => {
+  return file.size <= maxSizeMB * 1024 * 1024;
+};
+
+// Helper function for type validation
+const isFileTypeValid = (file: File, allowedTypes: string[]): boolean => {
+  return allowedTypes.includes(file.type);
+};
+
 interface ImageWorkspaceProps {
   updateHistory: (newRecord: GenerationRecord) => void
   selectedRecord?: GenerationRecord
@@ -43,6 +59,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
   const [isLoading, setIsLoading] = useState(false)
   const [results, setResults] = useState<string[]>([])
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
+  const [additionalImages, setAdditionalImages] = useState<string[] | null>(null); // New state for extra images
   const [mode, setMode] = useState<"generate" | "edit" | "variation">("generate")
   const [mask, setMask] = useState<string | null>(null)
   const [background, setBackground] = useState<"transparent" | "opaque" | "auto">("auto")
@@ -105,9 +122,10 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
     setShowCropper(false)
     setShowMaskInterface(false)
     onClearSelection()
+    setAdditionalImages(null); // Clear additional images too
   }, [model, onClearSelection])
 
-  // Calculate aspect ratio when uploaded image changes
+  // Calculate aspect ratio when the primary uploaded image changes
   useEffect(() => {
     if (uploadedImage) {
       const img = new window.Image();
@@ -124,32 +142,93 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
     }
   }, [uploadedImage]);
 
+  // Updated image upload handler
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string
-      if (model === "gpt-image-1") {
-        setUploadedImage(dataUrl)
-        setMode("edit")
-        setShowMaskInterface(true)
+    const maxSizeBytes = model === 'dall-e-2' ? DALLE2_MAX_SIZE_MB * 1024 * 1024 : GPT_IMAGE_1_MAX_SIZE_MB * 1024 * 1024;
+    const allowedTypes = model === 'dall-e-2' ? DALLE2_ALLOWED_TYPES : GPT_IMAGE_1_ALLOWED_TYPES;
+    const maxSizeMB = model === 'dall-e-2' ? DALLE2_MAX_SIZE_MB : GPT_IMAGE_1_MAX_SIZE_MB;
+
+    const validFiles: File[] = [];
+    const invalidFiles: { name: string; reason: string }[] = [];
+
+    Array.from(files).forEach(file => {
+      if (!isFileTypeValid(file, allowedTypes)) {
+        invalidFiles.push({ name: file.name, reason: `Invalid type (Allowed: ${allowedTypes.map(t => t.split('/')[1]).join(', ')})` });
+      } else if (!isFileSizeValid(file, maxSizeMB)) {
+        invalidFiles.push({ name: file.name, reason: `Too large (> ${maxSizeMB}MB)` });
       } else {
-        setOriginalImageFile(dataUrl)
-        setShowCropper(true)
+        validFiles.push(file);
       }
+    });
+
+    // Show toasts for invalid files
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "Invalid Files Skipped",
+        description: `${invalidFiles.map(f => `${f.name}: ${f.reason}`).join('\n')}`,
+        variant: "destructive",
+      });
     }
-    reader.readAsDataURL(file)
-  }
+
+    if (validFiles.length === 0) {
+      if (e.target) e.target.value = ''; // Reset file input if all files were invalid
+      return; // No valid files to process
+    }
+
+    const filePromises = validFiles.map(file => {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(filePromises).then(dataUrls => {
+      if (model === "gpt-image-1") {
+        if (!uploadedImage) {
+          // If no primary image yet, set the first as primary, rest as additional
+          setUploadedImage(dataUrls[0]);
+          if (dataUrls.length > 1) {
+            setAdditionalImages(dataUrls.slice(1));
+          } else {
+            setAdditionalImages([]); // Ensure it's an empty array if only one image uploaded
+          }
+          setMode("edit"); // Set mode only when the first image is set
+        } else {
+          // If primary image exists, add all new images to additional
+          setAdditionalImages(prev => [...(prev || []), ...dataUrls]);
+        }
+        setOriginalImageFile(null); // Not used for gpt flow
+      } else if (model === "dall-e-2") {
+        // DALL-E 2 only uses the first valid file for cropping/variation
+        setOriginalImageFile(dataUrls[0]);
+        setShowCropper(true);
+        setUploadedImage(null); // Clear primary image until crop is done
+        setAdditionalImages(null); // Ensure no additional images for DALL-E 2
+      }
+    }).catch(error => {
+      console.error("Error reading files:", error);
+      toast({ title: "Error Reading Files", description: "Could not process uploaded files.", variant: "destructive" });
+    });
+
+    // Reset file input value to allow re-uploading the same file(s)
+    if (e.target) e.target.value = '';
+  };
 
   const handleCropComplete = (croppedImage: string) => {
-    setUploadedImage(croppedImage)
-    setShowCropper(false)
-    if (model === "dall-e-2") {
-      setMode("variation")
+    setUploadedImage(croppedImage);
+    setShowCropper(false);
+    setAdditionalImages(null); // Cropping is DALL-E 2 specific, clear additional images
+    // Only set mode if it wasn't already set (e.g., by selecting a record)
+    if (mode !== 'edit' && mode !== 'variation') {
+      setMode("variation");
     }
-  }
+    setOriginalImageFile(null); // Clear the temp original file
+  };
 
   const handlePromptChange = (value: string) => {
     setPrompt(value);
@@ -177,7 +256,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKey) return;
-
+    // Prompt validation check
     if (mode !== "variation" && isPromptOverLimit(prompt)) {
       toast({
         title: "Prompt Too Long",
@@ -186,6 +265,26 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
       });
       return;
     }
+
+    // Check if an image is required and missing
+    if ((mode === 'edit' || mode === 'variation') && !uploadedImage) {
+      toast({
+        title: "Image Required",
+        description: `An image is needed for ${mode} mode. Please upload one.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    // Check if mask is required for edit mode and missing
+    if (mode === 'edit' && !mask && model === 'dall-e-2') { // DALL-E 2 requires a mask for edits
+      toast({
+        title: "Mask Required",
+        description: "Editing with DALL·E 2 requires a mask. Please create one.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Note: gpt-image-1 can do edits without a mask (edits whole image if null), required for dall-e-2 (handled above)
 
     setIsLoading(true);
     try {
@@ -200,8 +299,11 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
           quality
         })
       } else if (mode === "variation" && uploadedImage) {
+        // Pass only the primary image for variation
         response = await createImageVariation(apiKey, uploadedImage, numImages, size, model)
-      } else if (mode === "edit" && uploadedImage && mask) {
+      } else if (mode === "edit" && uploadedImage) {
+        // Pass only the primary image and mask for edit
+        // Mask is optional for gpt-image-1 (edits whole image if null), required for dall-e-2 (handled above)
         response = await createImageEdit(apiKey, uploadedImage, mask, prompt, numImages, size, model)
       } else {
         throw new Error("Invalid mode or missing data")
@@ -384,20 +486,81 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
   }
 
   const getEstimatedCost = () => {
+    // Pass the primary image for cost calculation if needed (though currently cost depends on size/n/model/quality)
     return calculateCost(size, numImages, model, quality).toFixed(3)
   }
 
   const handleSelectAsUpload = (base64Image: string) => {
-    setUploadedImage(base64Image)
+    setUploadedImage(base64Image) // Set as the new primary image
+    setAdditionalImages(null); // Clear any previous additional images
+    setMask(null); // Clear mask when selecting a result
     setResults([]) // Clear previous results
 
     if (model === "gpt-image-1") {
       setMode("edit") // Set mode to edit for gpt-image-1
-      setShowMaskInterface(true) // Show mask interface
+      // Don't automatically show mask interface, let user click if needed
+      // setShowMaskInterface(true)
     } else {
       setMode("variation") // Keep variation mode for dall-e-2
     }
   }
+
+  // --- New Handlers for Image Management ---
+
+  const handleSetPrimaryImage = (index: number) => {
+    if (!additionalImages || index < 0 || index >= additionalImages.length || !uploadedImage) return;
+
+    const newPrimary = additionalImages[index];
+    const oldPrimary = uploadedImage;
+
+    setUploadedImage(newPrimary);
+    setAdditionalImages(prev => {
+      if (!prev) return [];
+      const updated = [...prev];
+      updated[index] = oldPrimary; // Replace the clicked image with the old primary
+      return updated;
+    });
+    setMask(null); // Clear mask as the primary image changed
+    setShowMaskInterface(false); // Close mask interface if open
+    // Recalculate aspect ratio for the new primary image
+    const img = new window.Image();
+    img.onload = () => setImageAspectRatio(img.naturalWidth / img.naturalHeight);
+    img.onerror = () => setImageAspectRatio(1);
+    img.src = newPrimary;
+  };
+
+  const handleRemoveImage = (index: number, isPrimary: boolean) => {
+    if (isPrimary) {
+      if (additionalImages && additionalImages.length > 0) {
+        // Promote first additional image to primary
+        const newPrimary = additionalImages[0];
+        setUploadedImage(newPrimary);
+        setAdditionalImages(additionalImages.slice(1));
+        setMask(null); // Clear mask
+        setShowMaskInterface(false);
+        // Recalculate aspect ratio
+        const img = new window.Image();
+        img.onload = () => setImageAspectRatio(img.naturalWidth / img.naturalHeight);
+        img.onerror = () => setImageAspectRatio(1);
+        img.src = newPrimary;
+      } else {
+        // No additional images left, clear everything
+        setUploadedImage(null);
+        setAdditionalImages(null);
+        setMask(null);
+        setMode("generate"); // Revert to generate mode
+        setImageAspectRatio(1); // Reset aspect ratio
+        setShowMaskInterface(false);
+      }
+    } else {
+      // Remove from additionsl
+      setAdditionalImages(prev => prev ? prev.filter((_, i) => i !== index) : null);
+    }
+  };
+
+
+  // --- End New Handlers ---
+
 
   return (
     <ScrollArea className="h-[calc(100vh-72px)]">
@@ -414,14 +577,15 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
             />
           </div>
 
-          {/* Hidden file input - moved outside conditionals */}
+          {/* Hidden file input - updated */}
           <input
-            key={model}
+            key={`${model}-file-input`} // Change key to force re-render on model change if needed
             ref={fileInputRef}
             type="file"
-            accept="image/png"
+            accept={model === 'dall-e-2' ? DALLE2_ALLOWED_TYPES.join(',') : GPT_IMAGE_1_ALLOWED_TYPES.join(',')}
             className="hidden"
             onChange={handleImageUpload}
+            multiple={model === 'gpt-image-1'} // Allow multiple only for gpt-image-1
           />
 
           {selectedRecord && (
@@ -438,10 +602,11 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                 variant="destructive"
                 onClick={() => {
                   setPrompt("")
-                  setSize("1024x1024")
+                  setSize(model === "dall-e-2" ? "1024x1024" : "auto") // Reset size based on current model
                   setNumImages(1)
                   setMode("generate")
                   setUploadedImage(null)
+                  setAdditionalImages(null); // Clear additional images
                   setMask(null)
                   setResults([])
                   onClearSelection()
@@ -455,19 +620,20 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
               </Button>
             </div>
           )}
+          {/* Prompt Input Section (Logic unchanged, but context for layout) */}
           {uploadedImage ? (
-            <div className="flex gap-4 items-start"> {/* Changed to items-start */}
-              <div className="relative flex-1"> {/* Added relative container */}
+            <div className="flex gap-4 items-start"> {/* Main prompt/upload buttons row */}
+              <div className="relative flex-1"> {/* Prompt input with popup */}
                 <Input
                   value={prompt}
-                  onChange={(e) => handlePromptChange(e.target.value)} // Use handler
+                  onChange={(e) => handlePromptChange(e.target.value)}
                   placeholder={mode === "variation" ? "No prompt needed for variations" : "Enter your prompt here"}
-                  maxLength={model === "gpt-image-1" ? 32000 : 1000} // Dynamic max length
-                  className="flex-1 pr-10" // Adjust padding for the button and character limit
+                  maxLength={model === "gpt-image-1" ? 32000 : 1000}
+                  className="flex-1 pr-10"
                   disabled={mode === "variation"}
                   required={mode === "generate" || mode === "edit"}
                 />
-                <Badge className={`p-1 hidden sm:block absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono`} variant={prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'destructive' : undefined}>
+                <Badge className={`hidden sm:block absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono`} variant={prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'destructive' : undefined}>
                   {prompt.length} / {model === "gpt-image-1" ? 32000 : 1000}
                 </Badge>
                 <Button
@@ -482,41 +648,53 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                   <Maximize2 className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2"> {/* Upload/Clear buttons */}
                 <Button
                   type="button"
                   variant="outline"
                   className="gap-2"
                   onClick={() => fileInputRef.current?.click()}
+                  title={model === 'gpt-image-1' ? "Add more images" : "Replace image"}
                 >
                   <ImagePlus className="h-4 w-4" />
-                  <span className="hidden md:inline">Upload</span>
+                  <span className="hidden md:inline">
+                    {/* Change Button Text based on Context */}
+                    {model === 'gpt-image-1' ? "Add" : "Replace"}
+                  </span>
                 </Button>
+                {/* Keep the "Clear All" button concept for simplicity */}
                 <Button
                   type="button"
                   variant="destructive"
                   className="gap-2"
+                  title="Clear all uploaded images"
                   onClick={() => {
                     setUploadedImage(null)
+                    setAdditionalImages(null); // Clear additional images too
                     setMask(null)
                     setMode("generate")
                     setShowMaskInterface(false)
+                    setImageAspectRatio(1); // Reset aspect ratio
+                    // Also reset file input if needed (careful with refs)
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
                   }}
                 >
                   <ImageMinus className="h-4 w-4" />
-                  <span className="hidden md:inline">Clear</span>
+                  <span className="hidden md:inline">Clear All</span>
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="flex gap-4">
-              <div className="relative flex-1"> {/* Added relative container */}
+            <div className="flex gap-4">{/* Prompt input section when no image uploaded */}
+              <div className="relative flex-1"> {/* Prompt input with popup */}
                 <Input
                   value={prompt}
-                  onChange={(e) => handlePromptChange(e.target.value)} // Use handler
+                  onChange={(e) => handlePromptChange(e.target.value)}
                   placeholder="Enter your prompt here"
-                  maxLength={model === "gpt-image-1" ? 32000 : 1000} // Dynamic max length
-                  className="flex-1 pr-10" // Adjust padding for the button and character limit
+                  maxLength={model === "gpt-image-1" ? 32000 : 1000}
+                  className="flex-1 pr-10"
                   required
                 />
                 <Badge className={`p-1 hidden sm:block absolute right-10 top-1/2 -translate-y-1/2 text-xs font-mono`} variant={prompt.length > (model === "gpt-image-1" ? 32000 : 1000) ? 'destructive' : undefined}>
@@ -540,90 +718,176 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                 onClick={() => fileInputRef.current?.click()}
               >
                 <ImagePlus className="h-4 w-4" />
-                <span className="hidden md:inline">Upload</span>
+                <span className="hidden md:inline">
+                  {model === 'gpt-image-1' ? 'Upload (Multiple)' : 'Upload'}
+                </span>
               </Button>
             </div>
           )}
 
+          {/* --- Combined Image Management UI --- */}
           {uploadedImage && (
-            <div className="flex flex-col sm:flex-row gap-4 items-start">
-              <div className="border rounded-lg p-4 bg-muted/50 flex-1 w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="text-sm font-medium">
-                    {mode === "variation" ? "Image to Vary" : "Mask Preview"}
+            <div className="border rounded-lg p-4 bg-muted/50">
+              <div className="flex justify-between items-center mb-3">
+                <div className="text-sm font-medium">
+                  {/* Title changes based on model and mode */}
+                  {model === 'dall-e-2'
+                    ? (mode === 'variation' ? 'Image to Vary' : 'Image to Edit')
+                    : 'Image Management (GPT-Image-1 Edit Mode)'
+                  }
+                </div>
+                {/* Mode switch buttons (only for DALL-E 2) */}
+                {model === "dall-e-2" && (
+                  <div className="flex items-center gap-2">
+                    {/* DALL-E 2 variation/edit mode buttons remain unchanged here */}
+                    <Button
+                      type="button"
+                      variant={mode === "variation" ? "default" : "outline"}
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => handleModeChange("variation")}
+                    >
+                      <Images className="h-4 w-4" />
+                      <span className="hidden md:inline">Variation</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={mode === 'edit' ? 'default' : 'outline'}
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => handleModeChange("edit")}
+                    >
+                      <Edit className="h-4 w-4" />
+                      <span className="hidden md:inline">Edit</span>
+                    </Button>
                   </div>
-                  {model === "dall-e-2" && (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant={mode === "variation" ? "default" : "outline"}
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => handleModeChange("variation")}
-                      >
-                        <Images className="h-4 w-4" />
-                        <span className="hidden md:inline">Variation</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={mode === "edit" ? "default" : "outline"}
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => handleModeChange("edit")}
-                      >
-                        <Edit className="h-4 w-4" />
-                        <span className="hidden md:inline">Edit</span>
-                      </Button>
-                    </div>
+                )}
+              </div>
+
+              {/* Grid for Primary and Additional Images (Primarily for gpt-image-1) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {/* Primary Image */}
+                <div className="relative group aspect-square border-2 border-primary rounded-lg overflow-hidden">
+                  <Image
+                    src={uploadedImage}
+                    alt="Primary image for editing"
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+                    className="object-contain bg-background"
+                    // Only apply mask visualization if mask exists and not in variation mode
+                    style={mask && mode !== "variation" ? {
+                      mask: `url(${mask}) center/contain no-repeat`,
+                      WebkitMask: `url(${mask}) center/contain no-repeat`,
+                      maskMode: "alpha",
+                    } : undefined}
+                  />
+                  {/* Mask Edit/View Button */}
+                  {mode !== "variation" && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-1 left-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      title={mask ? "Edit Mask" : "Create Mask"}
+                      onClick={() => setShowMaskInterface(true)}
+                    >
+                      <Paintbrush className="h-3 w-3" />
+                    </Button>
+                  )}
+                  {/* Remove Primary Button */}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    title="Remove Image"
+                    onClick={() => handleRemoveImage(0, true)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                  {model === 'gpt-image-1' && (
+                    <>
+                      <Badge variant="secondary" className="absolute bottom-1 left-1 text-xs px-1.5 py-0.5 z-10">
+                        Primary
+                      </Badge>
+                      {/* Mask indicator: only show if not in variation mode */}
+                      {mask && mode !== "variation" && (
+                        <Badge variant="outline" className="absolute bottom-1 right-1 text-xs px-1.5 py-0.5 z-10 bg-background/80">
+                          Masked
+                        </Badge>
+                      )}
+                    </>
                   )}
                 </div>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div
-                    className={cn(
-                      "relative border rounded-lg overflow-hidden bg-checkerboard w-full group/preview",
-                      mode === "edit" && "cursor-pointer hover:ring-2 hover:ring-primary"
-                    )}
-                    style={{
-                      aspectRatio: imageAspectRatio,
-                      maxWidth: window?.innerWidth < 640 ? "100%" : "min(256px, 100%)"
-                    }}
-                    onClick={() => mode === "edit" && setShowMaskInterface(true)}
+
+                {/* Additional Images (only for gpt-image-1) */}
+                {model === 'gpt-image-1' && additionalImages && additionalImages.map((imgSrc, index) => (
+                  <div key={index} className="relative group aspect-square border rounded-lg overflow-hidden cursor-pointer hover:border-primary/50"
+                    title="Click to set as primary image"
+                    onClick={() => handleSetPrimaryImage(index)}
                   >
                     <Image
-                      src={uploadedImage}
-                      alt="Original image"
+                      src={imgSrc}
+                      alt={`Additional image ${index + 1}`}
                       fill
-                      sizes="(min-width: 640px) 256px, 100vw"
-                      className="object-contain"
-                      style={mode === "edit" && mask ? {
-                        mask: `url(${mask}) center/contain`,
-                        WebkitMask: `url(${mask}) center/contain`,
-                        maskMode: "alpha",
-                      } : undefined}
+                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+                      className="object-contain bg-background" // Use white bg for non-primary previews
                     />
-                    {mode === "edit" && (
-                      <div className="absolute inset-0 bg-background/80 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
-                        <Paintbrush className="h-6 w-6 text-primary" />
-                      </div>
-                    )}
+                    {/* Remove Additional Button */}
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      title="Remove Image"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent setting as primary when clicking remove
+                        handleRemoveImage(index, false);
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                    {/* Make Primary affordance */}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium p-1 text-center z-0">
+                      Set Primary
+                    </div>
                   </div>
-                  <div className="flex-1 text-sm text-muted-foreground">
-                    {mode === "variation" ? (
-                      <>
-                        <div className="font-medium text-foreground mb-1">Variation Mode</div>
-                        Generate variations of the uploaded image. No prompt needed.
-                      </>
-                    ) : (
-                      <>
-                        <div className="font-medium text-foreground mb-1">Edit Mode</div>
-                        {model === 'gpt-image-1' ?
-                          "Click the image to edit the mask. Areas you paint will be edited based on the prompt. If there is no mask, the whole area is subjected to editing." :
-                          "Click the image to edit the mask. Areas you paint will be edited based on the prompt."
-                        }
-                      </>
-                    )}
+                ))}
+              </div>
+
+              {/* Instructions / Info Area below the grid */}
+              <div className="mt-3 text-sm text-muted-foreground">
+                {model === 'gpt-image-1' ? (
+                  <div>
+                    <span>
+                      Click an image thumbnail to make it the{" "}
+                      <Badge variant="secondary" className="text-xs px-1 py-0 align-middle">
+                        Primary
+                      </Badge>{" "}
+                      image for editing.
+                    </span>
+                    <span className="ml-1">
+                      Use the{" "}
+                      <Paintbrush className="inline h-3 w-3 mx-0.5 align-middle" />
+                      <span className="align-middle">button on the primary image to create or edit its mask.</span>
+                    </span>
+                    <span className="block mt-1">
+                      Edits based on the prompt will be applied according to the mask (or to the whole image if no mask is present). Only the primary image is sent for editing.
+                    </span>
                   </div>
-                </div>
+                ) : (
+                  <span>
+                    {mode === 'variation'
+                      ? "Generates variations of the uploaded image."
+                      : (
+                        <>
+                          Use the <Paintbrush className="inline h-3 w-3 mx-0.5 align-middle" />
+                          <span className="align-middle">icon to edit the mask. Painted areas indicate where edits based on the prompt will occur. A mask is required for DALL-E 2 edits.</span>
+                        </>
+                      )
+                    }
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -633,7 +897,10 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
               <div className="sm:hidden">
                 <Select value={numImages.toString()} onValueChange={(value) => setNumImages(parseInt(value))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Number of images" />
+                    <div className="flex items-center gap-2">
+                      <Images className="h-4 w-4" />
+                      <SelectValue placeholder="Number of images" />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -730,16 +997,34 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={isLoading || !apiKey || (mode !== "generate" && !uploadedImage)}>
+            <Button
+              type="submit"
+              className="w-full sm:w-auto justify-center" // Full width on small screens
+              disabled={
+                isLoading ||
+                !apiKey ||
+                (
+                  (mode === 'edit' || mode === 'variation') &&
+                  !uploadedImage
+                ) ||
+                (mode === 'edit' && model === 'dall-e-2' && !mask)
+              }
+              title={
+                !apiKey ? "API Key required" :
+                  ((mode === 'edit' || mode === 'variation') && !uploadedImage) ? `Upload an image first` :
+                    (mode === 'edit' && model === 'dall-e-2' && !mask) ? "Create a mask for DALL·E 2 edit mode" :
+                      undefined
+              }
+            >
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="hidden md:inline">Processing...</span>
+                  <span>Processing...</span> {/* Show text always for button */}
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4" />
-                  <span className="hidden md:inline">
+                  <span> {/* Show text always for button */}
                     Generate
                     {getEstimatedCost() && parseFloat(getEstimatedCost()) > 0 && (
                       <Badge variant="secondary" className="ml-1.5 font-mono text-xs tabular-nums px-1.5 py-0.5">
@@ -752,7 +1037,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
             </Button>
           </div>
 
-          {/* Model-specific options */}
+          {/* Model-specific options (gpt-image-1) */}
           {model === "gpt-image-1" && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
@@ -822,6 +1107,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
           )}
         </form>
 
+        {/* Crop Interface (Logic mostly unchanged) */}
         {showCropper && originalImageFile && (
           <CropInterface
             image={originalImageFile}
@@ -829,28 +1115,40 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
             onCancel={() => {
               setShowCropper(false)
               setOriginalImageFile(null)
+              // Clear states if crop is cancelled fully
+              setUploadedImage(null);
+              setAdditionalImages(null);
+              setMode("generate");
+              setImageAspectRatio(1);
             }}
           />
         )}
 
+        {/* Mask Interface (Logic mostly unchanged, uses updated primary image) */}
         {showMaskInterface && uploadedImage && (
           <MaskInterface
             image={uploadedImage}
             onMaskComplete={(maskImage) => {
-              setMask(maskImage)
-              setShowMaskInterface(false)
+              if (!maskImage) {
+                setMask(null);
+                if (model === "dall-e-2") setMode("variation");
+              } else {
+                setMask(maskImage);
+              }
+              setShowMaskInterface(false);
             }}
             onCancel={() => {
-              setShowMaskInterface(false)
-              if (!mask) {
-                if (model === "dall-e-2") {
-                  setMode("variation")
-                }
+              setShowMaskInterface(false);
+              // Cancelling mask doesn't change image or mode for gpt-image-1
+              // For DALL-E 2, revert to variation if cancelling mask creation and none existed
+              if (!mask && model === "dall-e-2") {
+                setMode("variation");
               }
             }}
           />
         )}
 
+        {/* Loading Skeletons */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: numImages }).map((_, index) => (
@@ -909,6 +1207,7 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
           </div>
         )}
 
+        {/* Prompt Popup Dialog */}
         <Dialog open={isPromptPopupOpen} onOpenChange={setIsPromptPopupOpen}>
           <DialogContent className="sm:max-w-[625px]">
             <DialogHeader>
@@ -947,4 +1246,3 @@ export function ImageWorkspace({ updateHistory, selectedRecord, onClearSelection
     </ScrollArea>
   )
 }
-

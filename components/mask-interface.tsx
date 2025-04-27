@@ -182,9 +182,41 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
     }
 
     const handleComplete = useCallback(() => {
-        if (!maskCanvas) return
-        onMaskComplete(maskCanvas.toDataURL("image/png"))
-    }, [maskCanvas, onMaskComplete])
+        if (!maskCanvas) return;
+
+        // Check if the mask is "empty" (all alpha = 0, or all white)
+        const ctx = maskCanvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+        const { width, height } = maskCanvas;
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+
+        // Check if all pixels are fully opaque (default, unmasked)
+        let allOpaque = true;
+        let allTransparent = true;
+        for (let i = 0; i < data.length; i += 4) {
+            // If any alpha is not 255, it's not fully opaque
+            if (data[i + 3] !== 255) {
+                allOpaque = false;
+            }
+            // If any alpha is not 0, it's not fully transparent
+            if (data[i + 3] !== 0) {
+                allTransparent = false;
+            }
+            // Early exit if both are false
+            if (!allOpaque && !allTransparent) break;
+        }
+
+        // If mask is fully opaque (unchanged), treat as "no mask"
+        // If mask is fully transparent, also treat as "no mask"
+        if (allOpaque || allTransparent) {
+            // Do not apply or send the mask, mark as unmasked
+            onMaskComplete(""); // Send empty string or null to indicate unmasked
+        } else {
+            // Mask has been drawn, send the mask
+            onMaskComplete(maskCanvas.toDataURL("image/png"));
+        }
+    }, [maskCanvas, onMaskComplete]);
 
     return (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xs">
@@ -235,10 +267,10 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
                         </ScrollArea>
                     </div>
                     <div className="flex justify-end gap-4">
-                        <Button variant="outline" onClick={onCancel}>
+                        <Button variant="outline" type="button" onClick={onCancel}>
                             Cancel
                         </Button>
-                        <Button onClick={handleComplete}>Apply Mask</Button>
+                        <Button type="button" onClick={handleComplete}>Apply Mask</Button>
                     </div>
                 </div>
             </div>
