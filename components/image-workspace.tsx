@@ -1026,12 +1026,12 @@ export function ImageWorkspace({
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Processing...</span> {/* Show text always for button */}
+                  <span className="hidden sm:inline">Processing...</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4" />
-                  <span> {/* Show text always for button */}
+                  <span className="hidden sm:inline">
                     Generate
                     {getEstimatedCost() && parseFloat(getEstimatedCost()) > 0 && (
                       <Badge variant="secondary" className="ml-1.5 font-mono text-xs tabular-nums px-1.5 py-0.5">
