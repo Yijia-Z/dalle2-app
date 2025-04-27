@@ -6,7 +6,7 @@ import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -89,6 +89,7 @@ export function ImageWorkspace({
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stableOnClearSelection = useRef(onClearSelection);
 
   useEffect(() => {
     if (selectedRecord) {
@@ -129,6 +130,11 @@ export function ImageWorkspace({
     setSize(model === "dall-e-2" ? "1024x1024" : "auto")
   }, [model])
 
+  // Update ref when prop changes
+  useEffect(() => {
+    stableOnClearSelection.current = onClearSelection;
+  }, [onClearSelection]);
+
   // Clear non-reusable fields when model changes
   useEffect(() => {
     // Clear the primary uploaded image
@@ -146,10 +152,10 @@ export function ImageWorkspace({
     // Hide the mask interface
     setShowMaskInterface(false)
     // Call the provided callback to clear any external selection state
-    onClearSelection()
+    stableOnClearSelection.current()
     // Clear any additional images
     setAdditionalImages(null);
-  }, [model, onClearSelection])
+  }, [model])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1209,9 +1215,15 @@ export function ImageWorkspace({
 
         {/* Prompt Popup Dialog */}
         <Dialog open={isPromptPopupOpen} onOpenChange={setIsPromptPopupOpen}>
-          <DialogContent className="sm:max-w-[625px]">
+          <DialogContent className="sm:max-w-[625px] select-none">
             <DialogHeader>
               <DialogTitle>Edit Prompt</DialogTitle>
+              <DialogDescription>
+                {model === "gpt-image-1"
+                  ? "GPT Image 1 is a natively multimodal language model that accepts both text and image inputs, and produces image outputs."
+                  : "Older than DALL·E 3, DALL·E 2 offers more control in prompting and more requests at once."
+                }
+              </DialogDescription>
             </DialogHeader>
             <div className="py-4">
               <Textarea
