@@ -195,8 +195,41 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
+  }
+}
+
+/* Make all hover-to-display UI visible on mobile (touch) */
+@media (hover: none) and (pointer: coarse) {
+
+  /* Show elements that are normally hidden until hover */
+  .group:hover .group-hover\:opacity-100,
+  .group:active .group-hover\:opacity-100,
+  .group .group-hover\:opacity-100 {
+    opacity: 1 !important;
+  }
+
+  .hover\:opacity-100,
+  .active\:opacity-100 {
+    opacity: 1 !important;
+  }
+
+  .group:hover .group-hover\:opacity-0,
+  .group:active .group-hover\:opacity-0,
+  .group .group-hover\:opacity-0 {
+    opacity: 0 !important;
+  }
+
+  .hover\:opacity-0,
+  .active\:opacity-0 {
+    opacity: 0 !important;
+  }
+
+  /* If you use transition-opacity, keep transitions */
+  .transition-opacity {
+    transition-property: opacity;
   }
 }
