@@ -135,10 +135,10 @@ export function HistoryPanel({ history, onDelete, onSelect, className = "" }: Hi
 
   return (
     <div className={`${className} h-screen flex flex-col p-4 pb-0 pr-0`}>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           {selectedIds.length === 0 && (
-            <><History /><h2 className="text-2xl font-bold py-1">History</h2></>
+            <><History /><h2 className="text-lg font-bold py-1">History</h2></>
           )}
         </div>
         {selectedIds.length > 0 && (
@@ -182,7 +182,7 @@ export function HistoryPanel({ history, onDelete, onSelect, className = "" }: Hi
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="space-y-4 pr-4">
+        <div className="space-y-4 pr-4 pt-4">
           {history.map((record) => (
             <Card
               key={record.id}
@@ -260,7 +260,7 @@ export function HistoryPanel({ history, onDelete, onSelect, className = "" }: Hi
                             alt={`Generated image ${index + 1}`}
                             fill
                             sizes="(max-width: 768px) 100vw, 50vw"
-                            className="object-contain rounded-md"
+                            className="object-contain rounded-md shadow"
                           />
                         )}
                         {!selectedIds.includes(record.id) && (

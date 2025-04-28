@@ -642,7 +642,7 @@ export function ImageWorkspace({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 h-5.5 w-5.5 p-0 text-muted-foreground border"
                   onClick={openPromptPopup}
                   disabled={mode === "variation"}
                   aria-label="Edit prompt in popup"
@@ -705,7 +705,7 @@ export function ImageWorkspace({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 h-5.5 w-5.5 p-0 text-muted-foreground"
                   onClick={openPromptPopup}
                   aria-label="Edit prompt in popup"
                 >
@@ -849,7 +849,7 @@ export function ImageWorkspace({
                       alt={`Additional image ${index + 1}`}
                       fill
                       sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-                      className="object-contain bg-background" // Use white bg for non-primary previews
+                      className="object-contain bg-background shadow" // Use white bg for non-primary previews
                     />
                     {/* Remove Additional Button */}
                     <Button
@@ -1188,7 +1188,7 @@ export function ImageWorkspace({
                       alt={`Generated image ${index + 1}`}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-contain rounded-lg"
+                      className="object-contain rounded-lg shadow"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-muted rounded-lg">
