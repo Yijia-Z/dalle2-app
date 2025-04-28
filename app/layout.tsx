@@ -1,12 +1,12 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Merriweather } from "next/font/google"
+import { Courier_Prime } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import AnimatedSquareFavicon from "@/components/animated-square-favicon"
 
-const merriweather = Merriweather({
+const courier = Courier_Prime({
   subsets: ["latin"],
   weight: "400"
 })
@@ -26,7 +26,7 @@ export default function RootLayout({
       <head>
         <AnimatedSquareFavicon />
       </head>
-      <body className={merriweather.className}>
+      <body className={courier.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />

@@ -15,7 +15,7 @@ import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import { CropInterface } from "./crop-interface"
 import { MaskInterface } from "./mask-interface"
-import { Download, Edit, Eye, Grid2X2, Grid3X3, ImageMinus, ImagePlus, Images, Loader2, LoaderPinwheel, Maximize2, Paintbrush, RectangleHorizontal, RectangleVertical, Sparkles, Square, X } from "lucide-react"
+import { Download, Edit, Eye, Grid2X2, Grid3X3, ImageMinus, ImageOff, ImagePlus, Images, Loader2, LoaderPinwheel, Maximize2, Paintbrush, RectangleHorizontal, RectangleVertical, Sparkles, Square, SquareX, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { generateImage, createImageEdit, createImageVariation } from "@/lib/openai"
 import { getImageAsDataUrl, saveImage } from "@/lib/indexeddb"
@@ -565,7 +565,7 @@ export function ImageWorkspace({
   };
 
   return (
-    <ScrollArea className="h-[calc(100vh-72px)]">
+    <ScrollArea className="h-[calc(100vh-60px)]">
       <div className="space-y-6 p-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* API Key Input */}
@@ -617,8 +617,8 @@ export function ImageWorkspace({
                   setOriginalImageFile(null)
                 }}
               >
-                <X className="h-4 w-4" />
-                <span className="hidden md:inline">Clear Selection</span>
+                <SquareX className="h-4 w-4" />
+                <span className="hidden md:inline">Clear All</span>
               </Button>
             </div>
           )}
@@ -642,7 +642,7 @@ export function ImageWorkspace({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground"
                   onClick={openPromptPopup}
                   disabled={mode === "variation"}
                   aria-label="Edit prompt in popup"
@@ -682,8 +682,8 @@ export function ImageWorkspace({
                     }
                   }}
                 >
-                  <ImageMinus className="h-4 w-4" />
-                  <span className="hidden md:inline">Clear All</span>
+                  <ImageOff className="h-4 w-4" />
+                  <span className="hidden md:inline">Clear Image(s)</span>
                 </Button>
               </div>
             </div>
@@ -705,7 +705,7 @@ export function ImageWorkspace({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground"
                   onClick={openPromptPopup}
                   aria-label="Edit prompt in popup"
                 >
@@ -728,13 +728,13 @@ export function ImageWorkspace({
 
           {/* --- Combined Image Management UI --- */}
           {uploadedImage && (
-            <div className="border rounded-lg p-4 bg-muted/50">
+            <div className="border rounded-lg p-4 bg-muted/50 shadow">
               <div className="flex justify-between items-center mb-3">
                 <div className="text-sm font-medium">
                   {/* Title changes based on model and mode */}
                   {model === 'dall-e-2'
                     ? (mode === 'variation' ? 'Image to Vary' : 'Image to Edit')
-                    : 'Image Management (GPT-Image-1 Edit Mode)'
+                    : 'Image(s) to Edit'
                   }
                 </div>
                 {/* Mode switch buttons (only for DALL-E 2) */}
@@ -769,38 +769,35 @@ export function ImageWorkspace({
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {/* Primary Image */}
                 <div className="relative group aspect-square border-2 border-primary rounded-lg overflow-hidden">
-                  <Image
-                    src={uploadedImage}
-                    alt="Primary image for editing"
-                    fill
-                    sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-                    className="object-contain bg-background"
-                    // Only apply mask visualization if mask exists and not in variation mode
-                    style={mask && mode !== "variation" ? {
-                      maskImage: `url(${mask})`,
-                      WebkitMaskImage: `url(${mask})`,
-                      maskPosition: "center",
-                      WebkitMaskPosition: "center",
-                      maskRepeat: "no-repeat",
-                      WebkitMaskRepeat: "no-repeat",
-                      maskSize: "contain",
-                      WebkitMaskSize: "contain",
-                      maskMode: "alpha",
-                    } : undefined}
-                  />
-                  {/* Mask Edit/View Button */}
-                  {mode !== "variation" && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="icon"
-                      className="absolute top-1 left-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                      title={mask ? "Edit Mask" : "Create Mask"}
-                      onClick={() => setShowMaskInterface(true)}
-                    >
-                      <Paintbrush className="h-3 w-3" />
-                    </Button>
-                  )}
+                  <div className="w-full h-full relative">
+                    <Image
+                      src={uploadedImage}
+                      alt="Primary image for editing"
+                      fill
+                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+                      className="object-contain bg-background"
+                    />
+                    {/* Pulse effect inside masked area */}
+                    {mask && mode !== "variation" && (
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          maskImage: `url(${mask})`,
+                          WebkitMaskImage: `url(${mask})`,
+                          maskPosition: "center",
+                          WebkitMaskPosition: "center",
+                          maskRepeat: "no-repeat",
+                          WebkitMaskRepeat: "no-repeat",
+                          maskSize: "contain",
+                          WebkitMaskSize: "contain",
+                          maskMode: "alpha",
+                          background: "none",
+                        }}
+                      >
+                        <div className="w-full h-full animate-pulse bg-primary/30" />
+                      </div>
+                    )}
+                  </div>
                   {/* Remove Primary Button */}
                   <Button
                     type="button"
@@ -810,18 +807,32 @@ export function ImageWorkspace({
                     title="Remove Image"
                     onClick={() => handleRemoveImage(0, true)}
                   >
-                    <X className="h-3 w-3" />
+                    <ImageMinus className="h-3 w-3" />
                   </Button>
                   {model === 'gpt-image-1' && (
                     <>
+                      {/* Primary badge on top left */}
                       <Badge variant="secondary" className="absolute bottom-1 left-1 text-xs px-1.5 py-0.5 z-10">
                         Primary
                       </Badge>
-                      {/* Mask indicator: only show if not in variation mode */}
+                      {/* Mask indicator: only show if not in variation mode, on bottom left */}
                       {mask && mode !== "variation" && (
-                        <Badge variant="outline" className="absolute bottom-1 right-1 text-xs px-1.5 py-0.5 z-10 bg-background/80">
+                        <Badge variant="outline" className="absolute bottom-8 left-1 text-xs px-1.5 py-0.5 z-10 bg-background/80">
                           Masked
                         </Badge>
+                      )}
+                      {/* Mask Edit/View Button on bottom right */}
+                      {mode !== "variation" && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="absolute top-1 left-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                          title={mask ? "Edit Mask" : "Create Mask"}
+                          onClick={() => setShowMaskInterface(true)}
+                        >
+                          <Paintbrush className="h-3 w-3" />
+                        </Button>
                       )}
                     </>
                   )}
@@ -852,7 +863,7 @@ export function ImageWorkspace({
                         handleRemoveImage(index, false);
                       }}
                     >
-                      <X className="h-3 w-3" />
+                      <ImageMinus className="h-3 w-3" />
                     </Button>
                     {/* Make Primary affordance */}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium p-1 text-center z-0">
@@ -1220,8 +1231,8 @@ export function ImageWorkspace({
               <DialogTitle>Edit Prompt</DialogTitle>
               <DialogDescription>
                 {model === "gpt-image-1"
-                  ? "GPT Image 1 is a natively multimodal language model that accepts both text and image inputs, and produces image outputs."
-                  : "Older than DALL·E 3, DALL·E 2 offers more control in prompting and more requests at once."
+                  ? "GPT Image 1"
+                  : "DALL·E 2"
                 }
               </DialogDescription>
             </DialogHeader>
@@ -1234,6 +1245,7 @@ export function ImageWorkspace({
                   "min-h-[200px] max-h-[60vh] resize-y",
                   isPromptOverLimit(popupPromptText) && "text-destructive"
                 )}
+                style={{ wordBreak: "break-word" }}
               />
               <div className="text-xs text-right mt-1">
                 <span className={cn(

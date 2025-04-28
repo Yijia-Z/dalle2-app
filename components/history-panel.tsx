@@ -134,7 +134,7 @@ export function HistoryPanel({ history, onDelete, onSelect, className = "" }: Hi
   }
 
   return (
-    <div className={`${className} h-screen flex flex-col p-4 pr-0`}>
+    <div className={`${className} h-screen flex flex-col p-4 pb-0 pr-0`}>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           {selectedIds.length === 0 && (

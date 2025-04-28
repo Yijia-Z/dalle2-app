@@ -29,10 +29,33 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
         // Clear the display canvas
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
 
-        // Draw checkerboard pattern first
-        const pattern = createCheckerboardPattern(ctx)
-        ctx.fillStyle = pattern
-        ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+        // Draw checkerboard pattern first, matching theme
+        // Get theme colors from CSS variables
+        const getCSSVar = (name: string, fallback: string) => {
+            if (typeof window === "undefined") return fallback
+            const val = getComputedStyle(document.documentElement).getPropertyValue(name)
+            return val ? val.trim() : fallback
+        }
+        const bg = getCSSVar('--accent', '#e5e7eb')
+        const fg = getCSSVar('--background', '#ffffff')
+        // Create checkerboard pattern
+        const size = 20
+        const patternCanvas = document.createElement('canvas')
+        patternCanvas.width = size * 2
+        patternCanvas.height = size * 2
+        const pctx = patternCanvas.getContext('2d')
+        if (pctx) {
+            pctx.fillStyle = bg
+            pctx.fillRect(0, 0, patternCanvas.width, patternCanvas.height)
+            pctx.fillStyle = fg
+            pctx.fillRect(0, 0, size, size)
+            pctx.fillRect(size, size, size, size)
+        }
+        const pattern = ctx.createPattern(patternCanvas, 'repeat')
+        if (pattern) {
+            ctx.fillStyle = pattern
+            ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+        }
 
         // Draw the original image masked by the mask
         ctx.globalCompositeOperation = "source-over"
@@ -248,7 +271,20 @@ export function MaskInterface({ image, onMaskComplete, onCancel }: MaskInterface
                                             width: "100%",
                                             height: "auto",
                                             aspectRatio: canvasSize.width ? `${canvasSize.width}/${canvasSize.height}` : "1",
-                                            cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize * (1024 / canvasSize.width)}' height='${brushSize * (1024 / canvasSize.width)}'><circle cx='${brushSize * (1024 / canvasSize.width) / 2}' cy='${brushSize * (1024 / canvasSize.width) / 2}' r='${brushSize * (1024 / canvasSize.width) / 2}' fill='rgba(0,0,0,0.3)' stroke='white' stroke-width='1'/></svg>") ${brushSize * (1024 / canvasSize.width) / 2} ${brushSize * (1024 / canvasSize.width) / 2}, auto`
+                                            cursor: (() => {
+                                                // Get theme colors from CSS variables
+                                                const getCSSVar = (name: string, fallback: string) => {
+                                                    if (typeof window === "undefined") return fallback;
+                                                    const val = getComputedStyle(document.documentElement).getPropertyValue(name);
+                                                    return val ? val.trim() : fallback;
+                                                };
+                                                const brushPx = brushSize * (1024 / canvasSize.width);
+                                                const fill = getCSSVar('--background', '#fff'); // fallback to blue-500
+                                                const stroke = getCSSVar('--foreground', '#000');
+                                                // SVG with theme fill and stroke
+                                                const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${brushPx}' height='${brushPx}'><circle cx='${brushPx / 2}' cy='${brushPx / 2}' r='${brushPx / 2 - 1}' fill='${fill.replace(/#/g, '%23')}' fill-opacity='0.3' stroke='${stroke.replace(/#/g, '%23')}' stroke-width='1'/></svg>`;
+                                                return `url("data:image/svg+xml,${svg}") ${brushPx / 2} ${brushPx / 2}, auto`;
+                                            })()
                                         }}
                                         className="touch-none border rounded-lg"
                                         onMouseDown={startDrawing}

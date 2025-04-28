@@ -108,10 +108,10 @@ export default function Home() {
           {/* Top Bar */}
           <div className="p-4 pb-0 flex justify-between items-center">
             {/* Mobile History Toggle */}
-            <div className="md:hidden pr-2">
+            <div className="md:hidden">
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="icon">
+                  <Button variant="outline" size="icon" className="rounded-r-none">
                     <Menu className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
@@ -120,67 +120,69 @@ export default function Home() {
                 </SheetContent>
               </Sheet>
             </div>
-
-            <div className="pr-4 hidden sm:flex">
-              <svg xmlns="http://www.w3.org/2000/svg" width="100" height="20" viewBox="0 0 100 20">
-                {["#ffff66", "#42ffff", "#51da4c", "#ff6e3c", "#3c46ff"].map((color, index) => (
-                  <rect
-                    key={index}
-                    x={index * 20}
-                    width="20"
-                    height="20"
-                    fill={color}
-                    className="animate-pulse"
-                    style={{ animationDelay: `${Math.random() * 2}s` }}
-                  />
-                ))}
-              </svg>
+            <Select value={model} onValueChange={(value: "dall-e-2" | "gpt-image-1") => setModel(value)}>
+              <SelectTrigger className="w-[160px] rounded-l-none md:rounded">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Models</SelectLabel>
+                  <SelectItem value="dall-e-2">
+                    <div className="flex items-center gap-2">
+                      <img
+                        src="https://cdn.openai.com/API/docs/images/model-page/model-icons/dall-e-2.png"
+                        alt="DALL·E 2 icon"
+                        className="h-4 w-4"
+                      />
+                      DALL·E 2
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="gpt-image-1">
+                    <div className="flex items-center gap-2">
+                      <img
+                        src="https://cdn.openai.com/API/docs/images/model-page/model-icons/gpt-image-1.png"
+                        alt="GPT Image 1 icon"
+                        className="h-4 w-4"
+                      />
+                      GPT Image 1
+                    </div>
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-4 ml-auto">
+              <div className="hidden sm:flex relative items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="120" height="24" viewBox="0 0 120 24">
+                  {["#ffff66", "#42ffff", "#51da4c", "#ff6e3c", "#3c46ff"].map((color, index) => (
+                    <rect
+                      key={index}
+                      x={index * 24}
+                      width="24"
+                      height="24"
+                      fill={color}
+                      className="animate-pulse"
+                      style={{ animationDelay: `${Math.random() * 2}s` }}
+                    />
+                  ))}
+                </svg>
+                <h1
+                  className="text-lg absolute inset-0 flex items-center justify-center w-full h-full font-semibold text-accent-foreground dark:text-accent pointer-events-none"
+                  style={{ letterSpacing: "0.05em" }}
+                >
+                  {"ImageGen".split("").map((char, index) => (
+                    <AnimatedCharacter key={index}>{char}</AnimatedCharacter>
+                  ))}
+                </h1>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-semibold font-mono hidden md:block">
-                {"ImageGen".split("").map((char, index) => (
-                  <AnimatedCharacter key={index}>{char}</AnimatedCharacter>
-                ))}
-              </h1>
-              <Select value={model} onValueChange={(value: "dall-e-2" | "gpt-image-1") => setModel(value)}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Models</SelectLabel>
-                    <SelectItem value="dall-e-2">
-                      <div className="flex items-center gap-2">
-                        <img
-                          src="https://cdn.openai.com/API/docs/images/model-page/model-icons/dall-e-2.png"
-                          alt="DALL·E 2 icon"
-                          className="h-4 w-4"
-                        />
-                        DALL·E 2
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="gpt-image-1">
-                      <div className="flex items-center gap-2">
-                        <img
-                          src="https://cdn.openai.com/API/docs/images/model-page/model-icons/gpt-image-1.png"
-                          alt="GPT Image 1 icon"
-                          className="h-4 w-4"
-                        />
-                        GPT Image 1
-                      </div>
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
 
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center ml-auto">
               <a
                 href="https://github.com/Yijia-Z/dalle2-app"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="icon" className="rounded-r-none">
                   <GithubIcon className="h-4 w-4" />
                   <span className="sr-only">GitHub repository</span>
                 </Button>
@@ -190,6 +192,7 @@ export default function Home() {
               <Button
                 variant="outline"
                 size="icon"
+                className="rounded-l-none"
                 onClick={() => setTheme(theme === "light" ? "dark" : "light")}
               >
                 <SunIcon className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
